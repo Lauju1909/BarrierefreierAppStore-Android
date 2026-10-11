@@ -660,56 +660,105 @@ function closeAppDetails() {
   state.selectedApp = null;
 }
 
-// 13. Download & Installation starten
-function startAppInstall(app) {
+// 13. Download & Installation (nativ im Hintergrund)
+function getNativeInstaller() {
+  return window.Capacitor?.Plugins?.StoreInstaller || null;
+}
+
+async function ensureInstallPermission() {
+  const native = getNativeInstaller();
+  if (!native) return true;
+  const { value } = await native.canRequestPackageInstalls();
+  if (value) return true;
+  announceSR('Bitte erlaube dem Lauju Store, Apps zu installieren. Die Einstellungen öffnen sich jetzt.');
+  await native.openInstallPermissionSettings();
+  return false;
+}
+
+async function syncInstalledFromDevice() {
+  const native = getNativeInstaller();
+  if (!native) return;
+  try {
+    const { apps } = await native.getInstalledApps();
+    const known = new Set(state.apps.map(a => a.packageName));
+    const installed = {};
+    apps.forEach(p => {
+      if (known.has(p.packageName)) {
+        installed[p.packageName] = {
+          versionName: p.versionName,
+          versionCode: p.versionCode,
+          installedAt: Date.now()
+        };
+      }
+    });
+    state.installedApps = installed;
+    saveInstalledApps();
+  } catch (e) {
+    console.warn('Installierte Apps konnten nicht gelesen werden', e);
+  }
+}
+
+// Installiert ohne UI (für automatische Updates)
+async function installAppSilently(app) {
+  const native = getNativeInstaller();
+  if (!native) {
+    window.open(app.apkUrl, '_blank');
+    return;
+  }
+  if (!(await ensureInstallPermission())) return;
+  try {
+    await native.downloadAndInstall({ url: app.apkUrl, fileName: `${app.packageName}_${app.versionCode}.apk` });
+    playAudioCue();
+    announceSR(`${app.name} wurde auf Version ${app.versionName} aktualisiert.`);
+  } catch (e) {
+    announceSR(`Installation von ${app.name} fehlgeschlagen.`);
+    console.warn(e);
+  }
+}
+
+async function startAppInstall(app) {
   if (!app) return;
   const progressBox = document.getElementById('modal-download-progress');
   const progressFill = document.getElementById('modal-progress-fill');
   const progressLabel = document.getElementById('modal-progress-label');
   const actionBtn = document.getElementById('modal-btn-action');
 
+  const native = getNativeInstaller();
+
+  // Web-Fallback (Browser): normaler Download
+  if (!native) {
+    window.open(app.apkUrl, '_blank');
+    announceSR(`Download von ${app.name} gestartet.`);
+    return;
+  }
+
+  if (!(await ensureInstallPermission())) return;
+
   progressBox.style.display = 'block';
+  progressFill.style.width = '40%';
+  progressLabel.textContent = 'Lade APK im Hintergrund herunter...';
   actionBtn.disabled = true;
   announceSR(`Download von ${app.name} gestartet...`);
 
-  let progress = 0;
-  const interval = setInterval(() => {
-    progress += 25;
-    if (progress > 100) progress = 100;
-    progressFill.style.width = `${progress}%`;
-    progressLabel.textContent = `Lade APK herunter: ${progress}%...`;
+  try {
+    await native.downloadAndInstall({ url: app.apkUrl, fileName: `${app.packageName}_${app.versionCode}.apk` });
+    progressFill.style.width = '100%';
+    progressLabel.textContent = 'Installation läuft...';
+    playAudioCue();
+    announceSR(`${app.name} heruntergeladen. Installation wird ausgeführt.`);
+  } catch (e) {
+    progressLabel.textContent = 'Fehler beim Herunterladen.';
+    announceSR(`Installation von ${app.name} fehlgeschlagen.`);
+  }
 
-    if (progress >= 100) {
-      clearInterval(interval);
-      progressLabel.textContent = `Download abgeschlossen! Starte Android PackageInstaller...`;
-      playAudioCue();
-      announceSR(`${app.name} erfolgreich heruntergeladen. Installation wird ausgeführt.`);
-
-      // Als installiert im Store vermerken
-      state.installedApps[app.packageName] = {
-        versionName: app.versionName,
-        versionCode: app.versionCode || 1,
-        installedAt: Date.now()
-      };
-      saveInstalledApps();
-
-      // Download über Browser/Android auslösen
-      if (app.apkUrl) {
-        const link = document.createElement('a');
-        link.href = app.apkUrl;
-        link.download = `${app.id || 'app'}_v${app.versionName}.apk`;
-        link.click();
-      }
-
-      setTimeout(() => {
-        actionBtn.disabled = false;
-        openAppDetails(app); // Buttons neu laden
-        if (state.currentTab === 'explore') renderExploreList();
-        if (state.currentTab === 'updates') renderUpdatesList();
-        if (state.currentTab === 'installed') renderInstalledList();
-      }, 1000);
-    }
-  }, 200);
+  setTimeout(async () => {
+    actionBtn.disabled = false;
+    await syncInstalledFromDevice();
+    if (state.selectedApp) openAppDetails(app);
+    if (state.currentTab === 'explore') renderExploreList();
+    if (state.currentTab === 'updates') renderUpdatesList();
+    if (state.currentTab === 'installed') renderInstalledList();
+  }, 4000);
 }
 
 // 14. Repositories rendern & synchronisieren
@@ -742,29 +791,76 @@ function renderRepositoriesList() {
   });
 }
 
-async function syncAllRepositories() {
-  announceSR('Synchronisiere alle aktiven Paketquellen...');
+async function syncAllRepositories(silent = false) {
+  if (!silent) announceSR('Synchronisiere alle aktiven Paketquellen...');
   const syncBtn = document.getElementById('btn-sync-all');
   if (syncBtn) syncBtn.classList.add('pulsing');
 
-  try {
-    // 1. Laujus Repo live abfragen
-    const laujuRes = await fetch('https://raw.githubusercontent.com/Lauju1909/fdroid-repo/main/fdroid/repo/index-v1.json', { cache: 'no-store' });
-    if (laujuRes.ok) {
-      const data = await laujuRes.json();
-      console.log('Lauju F-Droid index geladen:', data);
+  let changed = false;
+  for (const repo of state.repositories.filter(r => r.enabled)) {
+    try {
+      const base = repo.url.replace(/\/+$/, '');
+      const res = await fetch(`${base}/index-v1.json?t=${Date.now()}`, { cache: 'no-store' });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const pkgs = data.packages || {};
+
+      (data.apps || []).forEach(meta => {
+        const versions = pkgs[meta.packageName];
+        if (!versions || versions.length === 0) return;
+        const latest = versions.reduce((a, b) => (b.versionCode > a.versionCode ? b : a));
+        const apkUrl = `${base}/${latest.apkName}`;
+        const sizeMb = latest.size ? `${(latest.size / 1048576).toFixed(1)} MB` : '';
+
+        const existing = state.apps.find(a => a.packageName === meta.packageName);
+        if (existing) {
+          if (latest.versionCode >= (existing.versionCode || 0)) {
+            if (existing.versionCode !== latest.versionCode) changed = true;
+            existing.versionName = latest.versionName;
+            existing.versionCode = latest.versionCode;
+            existing.apkUrl = apkUrl;
+            if (sizeMb) existing.size = sizeMb;
+            existing.repoId = repo.id;
+          }
+        } else {
+          state.apps.push({
+            id: meta.packageName,
+            packageName: meta.packageName,
+            name: meta.name || meta.packageName,
+            summary: meta.summary || '',
+            description: meta.description || meta.summary || '',
+            versionName: latest.versionName,
+            versionCode: latest.versionCode,
+            size: sizeMb || '? MB',
+            author: meta.authorName || 'Unbekannt',
+            category: 'tools',
+            icon: '📦',
+            license: meta.license || 'Open Source',
+            repoId: repo.id,
+            apkUrl,
+            sourceUrl: meta.sourceCode || '',
+            changelog: `v${latest.versionName}`
+          });
+          changed = true;
+        }
+      });
+    } catch (e) {
+      console.warn('Sync fehlgeschlagen für', repo.url, e);
     }
-  } catch (e) {
-    console.warn('Live F-Droid sync fallback:', e);
   }
 
-  setTimeout(() => {
-    if (syncBtn) syncBtn.classList.remove('pulsing');
+  localStorage.setItem('lauju_store_catalog', JSON.stringify(state.apps));
+  await syncInstalledFromDevice();
+
+  if (syncBtn) syncBtn.classList.remove('pulsing');
+  if (!silent) {
     playAudioCue();
-    announceSR('Alle Paketquellen erfolgreich synchronisiert. Katalog ist aktuell.');
-    updateBadgesAndLists();
-    renderExploreList();
-  }, 1000);
+    announceSR('Alle Paketquellen synchronisiert. Katalog ist aktuell.');
+  }
+  updateBadgesAndLists();
+  renderExploreList();
+  if (state.currentTab === 'updates') renderUpdatesList();
+  return changed;
 }
 
 // 15. Event Listener Registrierung
@@ -780,7 +876,7 @@ function setupEventListeners() {
   if (btnGotoExplore) btnGotoExplore.addEventListener('click', () => switchTab('explore'));
 
   // Sync Button
-  document.getElementById('btn-sync-all').addEventListener('click', syncAllRepositories);
+  document.getElementById('btn-sync-all').addEventListener('click', () => syncAllRepositories(false));
 
   // Suche
   const searchInput = document.getElementById('app-search-input');
@@ -865,16 +961,36 @@ function setupEventListeners() {
 
   // Check Updates Now Button
   const btnCheckUpdates = document.getElementById('btn-check-updates-now');
-  if (btnCheckUpdates) btnCheckUpdates.addEventListener('click', syncAllRepositories);
+  if (btnCheckUpdates) btnCheckUpdates.addEventListener('click', () => syncAllRepositories(false));
 
   // Self Update
-  document.getElementById('btn-self-update').addEventListener('click', () => {
+  document.getElementById('btn-self-update').addEventListener('click', async () => {
     announceSR('Suche nach Updates für Lauju Store...');
-    setTimeout(() => {
-      announceSR('Lauju Store ist auf der neuesten Version (v1.0.0).');
-      alert('Lauju Store ist bereits auf dem neuesten Stand (v1.0.0).');
-    }, 800);
+    await syncAllRepositories(true);
+    const self = getAvailableUpdates().find(u => u.app.packageName === STORE_PACKAGE);
+    if (self) {
+      announceSR(`Update auf Version ${self.app.versionName} gefunden. Installation startet.`);
+      installAppSilently(self.app);
+    } else {
+      announceSR(`Lauju Store ist auf dem neuesten Stand (${APP_VERSION}).`);
+      alert(`Lauju Store ist bereits auf dem neuesten Stand (${APP_VERSION}).`);
+    }
   });
+
+  // Intervall-Änderung speichern & neu planen
+  const intervalSel = document.getElementById('setting-update-interval');
+  if (intervalSel) {
+    intervalSel.value = localStorage.getItem('lauju_store_interval') || '12';
+    intervalSel.addEventListener('change', () => {
+      localStorage.setItem('lauju_store_interval', intervalSel.value);
+      scheduleAutoUpdates();
+    });
+  }
+  const autoInst = document.getElementById('setting-auto-install');
+  if (autoInst) {
+    autoInst.checked = localStorage.getItem('lauju_store_auto_install') !== 'false';
+    autoInst.addEventListener('change', () => localStorage.setItem('lauju_store_auto_install', String(autoInst.checked)));
+  }
 
   // Theme wechseln
   document.getElementById('setting-theme').addEventListener('change', (e) => {
@@ -920,11 +1036,56 @@ function setupEventListeners() {
   });
 }
 
+// 16. Automatische Update-Prüfung im Hintergrund
+let autoUpdateTimer = null;
+
+function getUpdateIntervalMs() {
+  const val = document.getElementById('setting-update-interval')?.value || '12';
+  if (val === 'manual') return 0;
+  return parseInt(val, 10) * 60 * 60 * 1000;
+}
+
+async function runAutoUpdateCheck(force = false) {
+  const intervalMs = getUpdateIntervalMs();
+  const last = parseInt(localStorage.getItem('lauju_store_last_check') || '0', 10);
+  if (!force && (intervalMs === 0 || Date.now() - last < intervalMs)) return;
+
+  await syncAllRepositories(true);
+  localStorage.setItem('lauju_store_last_check', String(Date.now()));
+
+  const autoInstall = document.getElementById('setting-auto-install')?.checked;
+  const updates = getAvailableUpdates();
+  if (autoInstall && updates.length > 0) {
+    announceSR(`${updates.length} Updates gefunden. Installation läuft im Hintergrund.`);
+    for (const u of updates) {
+      await installAppSilently(u.app);
+    }
+  }
+}
+
+function scheduleAutoUpdates() {
+  if (autoUpdateTimer) clearInterval(autoUpdateTimer);
+  // Alle 15 Minuten prüfen, ob das gewählte Intervall abgelaufen ist
+  autoUpdateTimer = setInterval(() => runAutoUpdateCheck(false), 15 * 60 * 1000);
+}
+
 // Start
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   loadSettingsAndState();
   setupEventListeners();
   renderExploreList();
   updateBadgesAndLists();
   announceSR('Lauju Store bereit. 4 Bereiche verfügbar: Entdecken, Installiert, Updates, Einstellungen.');
+
+  await syncInstalledFromDevice();
+  scheduleAutoUpdates();
+  runAutoUpdateCheck(false);
+
+  // Beim Zurückkehren in die App erneut prüfen
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      syncInstalledFromDevice();
+      runAutoUpdateCheck(false);
+    }
+  });
 });
