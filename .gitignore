@@ -1,0 +1,18 @@
+# Node
+node_modules/
+npm-debug.log
+
+# Android build
+android/.gradle
+android/build
+android/*/build
+android/captures
+android/local.properties
+android/.idea
+android/*.iml
+android/*/*.iml
+.gradle
+
+# OS
+.DS_Store
+Thumbs.db

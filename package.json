@@ -1,0 +1,29 @@
+{
+  "name": "barrierefreierappstore_android",
+  "version": "1.0.0",
+  "description": "Lauju Store – Moderner, barrierefreier App Store (F-Droid & Neo Store Client)",
+  "main": "index.js",
+  "scripts": {
+    "build": "echo 'Assets in www/ ready'",
+    "sync": "cap sync android"
+  },
+  "keywords": [
+    "android",
+    "appstore",
+    "fdroid",
+    "neostore",
+    "accessibility",
+    "talkback",
+    "a11y"
+  ],
+  "author": "Laurin Schneider",
+  "license": "MIT",
+  "type": "commonjs",
+  "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/cli": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/haptics": "^8.0.2"
+  }
+}

@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Lauju Store – Barrierefreier App Store (F-Droid &amp; Neo Store)</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-theme="dark" data-accent="blue">
+  <!-- ARIA Live Region für TalkBack & Screenreader -->
+  <div id="sr-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- Top App Bar -->
+  <header class="top-bar" role="banner">
+    <div class="top-bar-content">
+      <div class="app-branding">
+        <span class="logo-icon" aria-hidden="true">🏪</span>
+        <div class="app-title-group">
+          <h1 class="store-title">Lauju Store</h1>
+          <span class="store-subtitle">Barrierefreier Open-Source Store</span>
+        </div>
+      </div>
+      <div class="top-actions">
+        <button id="btn-sync-all" class="icon-btn" aria-label="Paketquellen jetzt synchronisieren" title="Repositories aktualisieren">
+          <span aria-hidden="true">🔄</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Suchleiste (im Tab Entdecken & Installiert aktiv) -->
+    <div id="search-container" class="search-bar-wrapper" role="search">
+      <div class="search-input-box">
+        <span class="search-icon" aria-hidden="true">🔍</span>
+        <input type="search" id="app-search-input" placeholder="Apps durchsuchen (Name, Kategorie, Paket-ID)..." aria-label="Apps durchsuchen" autocomplete="off">
+        <button id="btn-clear-search" class="clear-btn" aria-label="Sucheingabe löschen" style="display: none;">✕</button>
+      </div>
+    </div>
+
+    <!-- Kategorie-Chips (nur im Entdecken-Tab) -->
+    <div id="category-chips-bar" class="chips-scroll-container" role="tablist" aria-label="Kategorien">
+      <button class="chip active" role="tab" aria-selected="true" data-cat="all">🌟 Alle Apps</button>
+      <button class="chip" role="tab" aria-selected="false" data-cat="accessibility">♿ Barrierefreiheit</button>
+      <button class="chip" role="tab" aria-selected="false" data-cat="productivity">💰 Finanzen &amp; Alltag</button>
+      <button class="chip" role="tab" aria-selected="false" data-cat="education">🎓 Lernen &amp; Schule</button>
+      <button class="chip" role="tab" aria-selected="false" data-cat="games">🎮 Audio-Spiele</button>
+      <button class="chip" role="tab" aria-selected="false" data-cat="tools">🛠️ Werkzeuge</button>
+    </div>
+  </header>
+
+  <!-- Haupt-Container für die 4 Tabs -->
+  <main id="main-content" class="content-container" role="main">
+
+    <!-- TAB 1: ENTDECKEN (STORE / EXPLORE) -->
+    <section id="view-explore" class="tab-view active" role="tabpanel" aria-labelledby="nav-explore">
+      <div class="section-header-row">
+        <h2 class="section-heading">Katalog <span id="app-count-badge" class="count-badge">Lade...</span></h2>
+        <div class="sort-selector-wrapper">
+          <label for="sort-select" class="sr-only">Apps sortieren nach</label>
+          <select id="sort-select" class="sort-select" aria-label="Sortierung">
+            <option value="featured">Empfohlene</option>
+            <option value="name">Name (A-Z)</option>
+            <option value="updated">Neueste Version</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- App-Karten Liste -->
+      <div id="explore-apps-list" class="apps-grid" role="feed" aria-label="Verfügbare Anwendungen">
+        <!-- Wird dynamisch von app.js befüllt -->
+      </div>
+    </section>
+
+    <!-- TAB 2: INSTALLIERT (INSTALLED APPS) -->
+    <section id="view-installed" class="tab-view" role="tabpanel" aria-labelledby="nav-installed" style="display: none;">
+      <div class="section-header-row">
+        <h2 class="section-heading">Installierte Apps <span id="installed-count-badge" class="count-badge">0</span></h2>
+      </div>
+      <div id="installed-apps-list" class="apps-grid" role="feed" aria-label="Installierte Anwendungen">
+        <!-- Wird dynamisch von app.js befüllt -->
+      </div>
+      <div id="no-installed-placeholder" class="empty-placeholder" style="display: none;">
+        <span class="placeholder-icon">📥</span>
+        <h3>Noch keine Apps installiert</h3>
+        <p>Apps, die du über den Lauju Store installierst, erscheinen hier übersichtlich aufgelistet.</p>
+        <button id="btn-goto-explore" class="btn primary">Jetzt im Katalog stöbern</button>
+      </div>
+    </section>
+
+    <!-- TAB 3: UPDATES -->
+    <section id="view-updates" class="tab-view" role="tabpanel" aria-labelledby="nav-updates" style="display: none;">
+      <div class="section-header-row">
+        <h2 class="section-heading">Verfügbare Updates <span id="updates-count-badge" class="count-badge highlight">0</span></h2>
+        <button id="btn-update-all" class="btn primary" style="display: none;">
+          ⚡ Alle aktualisieren
+        </button>
+      </div>
+
+      <div id="updates-apps-list" class="apps-grid" role="feed" aria-label="Verfügbare App Updates">
+        <!-- Wird dynamisch von app.js befüllt -->
+      </div>
+
+      <div id="no-updates-placeholder" class="empty-placeholder" style="display: none;">
+        <span class="placeholder-icon">✅</span>
+        <h3>Alles auf dem neuesten Stand!</h3>
+        <p>Alle deine installierten Anwendungen verfügen über die aktuellste Version.</p>
+        <button id="btn-check-updates-now" class="btn outline" style="margin-top: 12px;">
+          🔄 Jetzt nach Updates suchen
+        </button>
+      </div>
+    </section>
+
+    <!-- TAB 4: EINSTELLUNGEN (SETTINGS) -->
+    <section id="view-settings" class="tab-view" role="tabpanel" aria-labelledby="nav-settings" style="display: none;">
+      <h2 class="section-heading">Einstellungen</h2>
+
+      <!-- Gruppe 1: Paketquellen (Repositories) -->
+      <div class="settings-group">
+        <h3 class="settings-group-title">📦 Paketquellen (F-Droid Repositories)</h3>
+        <p class="settings-group-desc">Verwalte deine aktiven Paketquellen. Apps werden automatisch aus diesen Quellen bezogen.</p>
+
+        <div id="repo-list" class="repo-list-container">
+          <!-- Dynamisch befüllt -->
+        </div>
+
+        <button id="btn-add-repo" class="btn primary" style="margin-top: 14px; width: 100%;">
+          ➕ Neue Paketquelle hinzufügen
+        </button>
+      </div>
+
+      <!-- Gruppe 2: Automatische Updates -->
+      <div class="settings-group">
+        <h3 class="settings-group-title">🔄 Automatische Update-Prüfung</h3>
+        <div class="setting-row">
+          <div class="setting-label-box">
+            <span class="setting-name">Update-Intervall</span>
+            <span class="setting-desc">Wie oft im Hintergrund nach neuen App-Versionen gesucht wird.</span>
+          </div>
+          <select id="setting-update-interval" class="setting-select" aria-label="Update-Intervall">
+            <option value="6">Alle 6 Stunden</option>
+            <option value="12" selected>Alle 12 Stunden</option>
+            <option value="24">Einmal täglich</option>
+            <option value="manual">Nur manuell</option>
+          </select>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-label-box">
+            <span class="setting-name">Nur über WLAN herunterladen</span>
+            <span class="setting-desc">Schont dein mobiles Datenvolumen bei großen App-Downloads.</span>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="setting-wifi-only" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Gruppe 3: Sicherheit & Google Play Protect -->
+      <div class="settings-group">
+        <h3 class="settings-group-title">🛡️ Sicherheit &amp; Google Play Protect</h3>
+        <div class="setting-row">
+          <div class="setting-label-box">
+            <span class="setting-name">SHA-256 Prüfsummen-Verifizierung</span>
+            <span class="setting-desc">Prüft jede heruntergeladene APK-Datei vor der Installation auf Echtheit.</span>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="setting-verify-checksum" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="play-protect-card">
+          <div class="play-protect-header">
+            <span aria-hidden="true">🛡️</span>
+            <strong>Google Play Protect Kompatibilität</strong>
+          </div>
+          <p>Alle Apps in diesem Store verwenden den offiziellen Android PackageInstaller und sind reine, transparente Open-Source-Anwendungen ohne Tracker oder bösartige Codes.</p>
+        </div>
+      </div>
+
+      <!-- Gruppe 4: Barrierefreiheit & TalkBack -->
+      <div class="settings-group">
+        <h3 class="settings-group-title">♿ Barrierefreiheit &amp; Screenreader</h3>
+        <div class="setting-row">
+          <div class="setting-label-box">
+            <span class="setting-name">Erweiterte TalkBack-Ansagen</span>
+            <span class="setting-desc">Kündigt Download-Fortschritte und fertige Installationen akustisch an.</span>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="setting-talkback-feedback" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-label-box">
+            <span class="setting-name">Akustisches Signal bei Download-Ende</span>
+            <span class="setting-desc">Spielt einen kurzen Ton ab, sobald eine App bereit zur Installation ist.</span>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="setting-audio-cue" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Gruppe 5: Design & Erscheinungsbild -->
+      <div class="settings-group">
+        <h3 class="settings-group-title">🎨 Erscheinungsbild (Material You)</h3>
+        <div class="setting-row">
+          <div class="setting-label-box">
+            <span class="setting-name">Farbschema</span>
+            <span class="setting-desc">Wähle zwischen Dunkel-, Hell- oder tiefschwarzem AMOLED-Modus.</span>
+          </div>
+          <select id="setting-theme" class="setting-select" aria-label="Farbschema">
+            <option value="dark" selected>Dunkelmodus</option>
+            <option value="light">Hellmodus</option>
+            <option value="amoled">AMOLED Schwarz (Sehr hoher Kontrast)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Gruppe 6: Über die App & Selbst-Update -->
+      <div class="settings-group">
+        <h3 class="settings-group-title">ℹ️ Über Lauju Store</h3>
+        <div class="about-card">
+          <p><strong>Lauju Store</strong> – Version <span id="store-version-display">v1.0.0</span></p>
+          <p>Entwickelt von Laurin Schneider für 100% barrierefreies App-Management auf Android.</p>
+          <button id="btn-self-update" class="btn outline" style="margin-top: 10px;">
+            🔍 Nach Store-Update suchen
+          </button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Bottom Navigation Bar (Material You 3 Style) -->
+  <nav class="bottom-nav" role="navigation" aria-label="Hauptnavigation">
+    <button id="nav-explore" class="nav-item active" role="tab" aria-selected="true" aria-controls="view-explore">
+      <span class="nav-icon" aria-hidden="true">🌟</span>
+      <span class="nav-label">Entdecken</span>
+    </button>
+    <button id="nav-installed" class="nav-item" role="tab" aria-selected="false" aria-controls="view-installed">
+      <span class="nav-icon" aria-hidden="true">📱</span>
+      <span class="nav-label">Installiert</span>
+    </button>
+    <button id="nav-updates" class="nav-item" role="tab" aria-selected="false" aria-controls="view-updates">
+      <div class="badge-icon-wrapper">
+        <span class="nav-icon" aria-hidden="true">🔄</span>
+        <span id="nav-updates-badge" class="nav-badge" style="display: none;">0</span>
+      </div>
+      <span class="nav-label">Updates</span>
+    </button>
+    <button id="nav-settings" class="nav-item" role="tab" aria-selected="false" aria-controls="view-settings">
+      <span class="nav-icon" aria-hidden="true">⚙️</span>
+      <span class="nav-label">Einstellungen</span>
+    </button>
+  </nav>
+
+  <!-- Detail-Modal / Sheet für App-Informationen -->
+  <div id="app-detail-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-app-title" style="display: none;">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <button id="btn-close-modal" class="icon-btn close-modal-btn" aria-label="App-Details schließen">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="modal-app-intro">
+          <div class="modal-app-icon" id="modal-app-icon">📦</div>
+          <div class="modal-app-meta">
+            <h2 id="modal-app-title" class="modal-title">App Name</h2>
+            <p id="modal-app-author" class="modal-author">Entwickler</p>
+            <div class="modal-pills">
+              <span id="modal-app-version" class="pill version-pill">v1.0.0</span>
+              <span id="modal-app-size" class="pill size-pill">0 MB</span>
+              <span id="modal-app-repo" class="pill repo-pill">Lauju Repo</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Aktions-Button: Installieren / Öffnen / Aktualisieren -->
+        <div class="modal-action-bar">
+          <button id="modal-btn-action" class="btn primary btn-large" aria-label="App herunterladen und installieren">
+            📥 Installieren
+          </button>
+          <button id="modal-btn-uninstall" class="btn danger" style="display: none;" aria-label="App deinstallieren">
+            🗑️ Deinstallieren
+          </button>
+        </div>
+
+        <!-- Download Fortschrittsanzeige -->
+        <div id="modal-download-progress" class="download-progress-box" style="display: none;">
+          <div class="progress-bar-track">
+            <div id="modal-progress-fill" class="progress-bar-fill"></div>
+          </div>
+          <span id="modal-progress-label" class="progress-label">Lade APK herunter...</span>
+        </div>
+
+        <!-- Beschreibung & Details -->
+        <div class="modal-section">
+          <h3 class="modal-section-title">Beschreibung</h3>
+          <p id="modal-app-description" class="modal-desc-text">Ausführliche Beschreibung...</p>
+        </div>
+
+        <!-- Changelog / Was ist neu -->
+        <div class="modal-section">
+          <h3 class="modal-section-title">Was ist neu</h3>
+          <p id="modal-app-changelog" class="modal-changelog-text">Neueste Fehlerbehebungen und Verbesserungen.</p>
+        </div>
+
+        <!-- Sicherheit & Prüfsummen -->
+        <div class="modal-section security-section">
+          <h3 class="modal-section-title">🛡️ Sicherheit &amp; Metadaten</h3>
+          <div class="meta-data-grid">
+            <div class="meta-row">
+              <span class="meta-key">Paket-ID:</span>
+              <code id="modal-app-package" class="meta-val">de.lauri.app</code>
+            </div>
+            <div class="meta-row">
+              <span class="meta-key">Lizenz:</span>
+              <span id="modal-app-license" class="meta-val">GPL-3.0 / MIT (Open Source)</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-key">Prüfsumme:</span>
+              <code id="modal-app-sha256" class="meta-val hash-val">SHA-256 gesichert</code>
+            </div>
+          </div>
+        </div>
+
+        <!-- Externe Links -->
+        <div class="modal-section links-section">
+          <a id="modal-link-source" href="#" target="_blank" rel="noopener" class="btn outline" style="width: 100%; margin-bottom: 8px;">
+            🔗 Quellcode auf GitHub ansehen
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Neue Paketquelle hinzufügen -->
+  <div id="add-repo-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="add-repo-title" style="display: none;">
+    <div class="modal-sheet add-repo-sheet">
+      <div class="modal-header">
+        <h2 id="add-repo-title" class="modal-title">Paketquelle hinzufügen</h2>
+        <button id="btn-close-repo-modal" class="icon-btn close-modal-btn" aria-label="Schließen">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="add-repo-form">
+          <div class="form-group">
+            <label for="input-repo-name">Name der Paketquelle</label>
+            <input type="text" id="input-repo-name" class="form-input" placeholder="z. B. Mein Eigenes Repo" required>
+          </div>
+          <div class="form-group">
+            <label for="input-repo-url">Repository-Adresse (URL)</label>
+            <input type="url" id="input-repo-url" class="form-input" placeholder="https://example.com/fdroid/repo" required>
+          </div>
+          <div class="form-group">
+            <label for="input-repo-fingerprint">Fingerprint (Optional)</label>
+            <input type="text" id="input-repo-fingerprint" class="form-input" placeholder="6C B8 11 B8 ...">
+          </div>
+          <button type="submit" class="btn primary btn-large" style="width: 100%; margin-top: 14px;">
+            Hinzufügen &amp; Laden
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
