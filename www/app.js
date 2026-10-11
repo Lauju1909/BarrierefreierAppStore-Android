@@ -222,9 +222,11 @@ let state = {
   searchQuery: '',
   currentCategory: 'all',
   currentSort: 'featured',
+  installedFilter: 'store_only',
   repositories: [],
   apps: [],
-  installedApps: {}, // packageName -> { versionName, versionCode, installedAt }
+  installedApps: {}, // packageName -> { versionName, versionCode, installedAt, name, iconBase64 }
+  allDeviceApps: [], // Liste aller installierten Apps vom Gerät
   selectedApp: null
 };
 
@@ -424,7 +426,7 @@ function renderExploreList() {
     card.setAttribute('aria-label', `${app.name}, Version ${app.versionName}. ${isInstalled ? 'Bereits installiert.' : 'Nicht installiert.'}`);
 
     card.innerHTML = `
-      <div class="app-card-icon" aria-hidden="true">${app.icon || '📦'}</div>
+      <div class="app-card-icon" aria-hidden="true">${renderAppIconHtml(app.icon)}</div>
       <div class="app-card-info">
         <h3 class="app-card-title">${app.name}</h3>
         <p class="app-card-desc">${app.summary}</p>
@@ -455,6 +457,14 @@ function renderExploreList() {
   });
 }
 
+function renderAppIconHtml(icon) {
+  if (!icon) return '📦';
+  if (icon.startsWith('data:image') || icon.startsWith('http://') || icon.startsWith('https://')) {
+    return `<img src="${icon}" alt="" loading="lazy">`;
+  }
+  return icon;
+}
+
 function getRepoBadge(repoId) {
   if (repoId === 'lauju') return '🌟 Lauju';
   if (repoId === 'fdroid') return '📦 F-Droid';
@@ -468,50 +478,110 @@ function renderInstalledList() {
   const countBadge = document.getElementById('installed-count-badge');
   const placeholder = document.getElementById('no-installed-placeholder');
 
-  const installedKeys = Object.keys(state.installedApps);
-  countBadge.textContent = `${installedKeys.length}`;
+  let listToRender = [];
+  const filter = state.installedFilter || 'store_only';
+
+  if (filter === 'all_device' && state.allDeviceApps && state.allDeviceApps.length > 0) {
+    listToRender = state.allDeviceApps.map(dev => {
+      const catalogApp = state.apps.find(a => a.packageName === dev.packageName);
+      return {
+        packageName: dev.packageName,
+        name: dev.name || dev.packageName,
+        versionName: dev.versionName || '1.0',
+        versionCode: dev.versionCode || 1,
+        icon: dev.iconBase64 || (catalogApp ? catalogApp.icon : '📱'),
+        summary: catalogApp ? catalogApp.summary : `Paket: ${dev.packageName}`,
+        isSystem: dev.isSystem,
+        catalogApp: catalogApp || null
+      };
+    });
+  } else {
+    const installedKeys = Object.keys(state.installedApps);
+    listToRender = installedKeys.map(pkg => {
+      const inst = state.installedApps[pkg];
+      const catalogApp = state.apps.find(a => a.packageName === pkg);
+      return {
+        packageName: pkg,
+        name: inst.name || (catalogApp ? catalogApp.name : pkg),
+        versionName: inst.versionName || (catalogApp ? catalogApp.versionName : '1.0'),
+        versionCode: inst.versionCode || 1,
+        icon: inst.iconBase64 || (catalogApp ? catalogApp.icon : '📱'),
+        summary: catalogApp ? catalogApp.summary : 'Auf diesem Gerät installiert',
+        isSystem: false,
+        catalogApp: catalogApp || null
+      };
+    });
+  }
+
+  // Suchfilter auf installierte Apps anwenden
+  if (state.searchQuery.trim() !== '') {
+    const q = state.searchQuery.toLowerCase();
+    listToRender = listToRender.filter(item =>
+      item.name.toLowerCase().includes(q) ||
+      item.packageName.toLowerCase().includes(q) ||
+      (item.summary && item.summary.toLowerCase().includes(q))
+    );
+  }
+
+  countBadge.textContent = `${listToRender.length}`;
   container.innerHTML = '';
 
-  if (installedKeys.length === 0) {
+  if (listToRender.length === 0) {
     placeholder.style.display = 'block';
     return;
   }
   placeholder.style.display = 'none';
 
-  installedKeys.forEach(pkg => {
-    const appInfo = state.apps.find(a => a.packageName === pkg) || {
-      name: pkg,
-      packageName: pkg,
-      icon: '📱',
-      summary: 'Auf diesem Gerät installiert',
-      versionName: state.installedApps[pkg].versionName || '1.0.0',
-      size: 'Installiert',
-      repoId: 'lokal'
-    };
-
+  listToRender.forEach(item => {
     const card = document.createElement('article');
     card.className = 'app-card';
     card.tabIndex = 0;
     card.setAttribute('role', 'article');
-    card.setAttribute('aria-label', `${appInfo.name}, installierte Version ${state.installedApps[pkg].versionName}`);
+    card.setAttribute('aria-label', `${item.name}, Version ${item.versionName}. Installiert.`);
 
     card.innerHTML = `
-      <div class="app-card-icon" aria-hidden="true">${appInfo.icon || '📱'}</div>
+      <div class="app-card-icon" aria-hidden="true">${renderAppIconHtml(item.icon)}</div>
       <div class="app-card-info">
-        <h3 class="app-card-title">${appInfo.name}</h3>
-        <p class="app-card-desc">${appInfo.summary}</p>
+        <h3 class="app-card-title">${item.name}</h3>
+        <p class="app-card-desc">${item.summary}</p>
         <div class="app-card-meta">
-          <span class="app-card-version">v${state.installedApps[pkg].versionName}</span>
+          <span class="app-card-version">v${item.versionName}</span>
           <span>•</span>
           <span style="color: var(--md-sys-color-success);">✅ Installiert</span>
         </div>
       </div>
       <div class="app-card-action">
-        <button class="btn primary" aria-label="${appInfo.name} starten">Öffnen</button>
+        <button class="btn primary btn-open-card" aria-label="${item.name} starten">Öffnen</button>
       </div>
     `;
 
-    card.addEventListener('click', () => openAppDetails(appInfo));
+    card.querySelector('.btn-open-card').addEventListener('click', (e) => {
+      e.stopPropagation();
+      openAppByPackage(item.packageName, item.name);
+    });
+
+    card.addEventListener('click', () => {
+      const fullApp = item.catalogApp || {
+        id: item.packageName,
+        packageName: item.packageName,
+        name: item.name,
+        summary: item.summary,
+        description: `Installierte Anwendung auf deinem Gerät.\nPaketname: ${item.packageName}\nVersion: v${item.versionName}`,
+        versionName: item.versionName,
+        versionCode: item.versionCode,
+        size: 'Installiert',
+        author: item.isSystem ? 'Systemanwendung' : 'Installierte App',
+        category: 'tools',
+        icon: item.icon,
+        license: 'Installiert',
+        repoId: 'lokal',
+        apkUrl: '',
+        sourceUrl: '',
+        changelog: 'Lokal auf dem Android-Gerät installiert.'
+      };
+      openAppDetails(fullApp);
+    });
+
     container.appendChild(card);
   });
 }
@@ -561,7 +631,7 @@ function renderUpdatesList() {
     card.tabIndex = 0;
 
     card.innerHTML = `
-      <div class="app-card-icon" aria-hidden="true">${app.icon || '🔄'}</div>
+      <div class="app-card-icon" aria-hidden="true">${renderAppIconHtml(app.icon)}</div>
       <div class="app-card-info">
         <h3 class="app-card-title">${app.name}</h3>
         <p class="app-card-desc" style="color: var(--md-sys-color-primary); font-weight: 600;">
@@ -617,7 +687,7 @@ function openAppDetails(app) {
   const updates = getAvailableUpdates();
   const hasUpdate = updates.some(u => u.app.packageName === app.packageName);
 
-  document.getElementById('modal-app-icon').textContent = app.icon || '📦';
+  document.getElementById('modal-app-icon').innerHTML = renderAppIconHtml(app.icon);
   document.getElementById('modal-app-title').textContent = app.name;
   document.getElementById('modal-app-author').textContent = `Von: ${app.author || 'Open Source Entwickler'}`;
   document.getElementById('modal-app-version').textContent = `v${app.versionName}`;
@@ -675,18 +745,57 @@ async function ensureInstallPermission() {
   return false;
 }
 
+// Reales Öffnen & Deinstallieren über nativen Installer
+async function openAppByPackage(packageName, appName = '') {
+  const native = getNativeInstaller();
+  if (native) {
+    try {
+      await native.openApp({ packageName });
+      announceSR(`${appName || packageName} wird gestartet.`);
+    } catch (e) {
+      announceSR(`Konnte ${appName || packageName} nicht öffnen: ${e.message || e}`);
+      alert(`Konnte App nicht starten: ${e.message || e}`);
+    }
+  } else {
+    announceSR(`${appName || packageName} öffnen (Simulation im Webbrowser).`);
+  }
+}
+
+async function uninstallAppByPackage(packageName, appName = '') {
+  const native = getNativeInstaller();
+  if (native) {
+    try {
+      await native.uninstallApp({ packageName });
+      announceSR(`Deinstallation für ${appName || packageName} aufgerufen.`);
+    } catch (e) {
+      announceSR(`Fehler beim Aufruf der Deinstallation: ${e.message || e}`);
+    }
+  }
+  // Lokal sofort austragen
+  delete state.installedApps[packageName];
+  state.allDeviceApps = state.allDeviceApps.filter(a => a.packageName !== packageName);
+  saveInstalledApps();
+  closeAppDetails();
+  if (state.currentTab === 'installed') renderInstalledList();
+  if (state.currentTab === 'updates') renderUpdatesList();
+  if (state.currentTab === 'explore') renderExploreList();
+}
+
 async function syncInstalledFromDevice() {
   const native = getNativeInstaller();
   if (!native) return;
   try {
-    const { apps } = await native.getInstalledApps();
+    const { apps } = await native.getInstalledApps({ includeSystem: false });
+    state.allDeviceApps = apps || [];
     const known = new Set(state.apps.map(a => a.packageName));
     const installed = {};
-    apps.forEach(p => {
+    (apps || []).forEach(p => {
       if (known.has(p.packageName)) {
         installed[p.packageName] = {
           versionName: p.versionName,
           versionCode: p.versionCode,
+          name: p.name,
+          iconBase64: p.iconBase64 || null,
           installedAt: Date.now()
         };
       }
@@ -698,6 +807,25 @@ async function syncInstalledFromDevice() {
   }
 }
 
+// Hilfsfunktion: WLAN-Bedingung prüfen (falls in den Einstellungen aktiv)
+async function checkWifiRequirement() {
+  const wifiOnly = document.getElementById('setting-wifi-only')?.checked ?? true;
+  if (!wifiOnly) return true;
+  const native = getNativeInstaller();
+  if (!native) return true;
+  try {
+    const { isWifi } = await native.isWifiConnected();
+    if (!isWifi) {
+      announceSR('Download abgebrochen: Nur über WLAN herunterladen ist aktiv, aber kein WLAN verbunden.');
+      alert('Download pausiert: Du bist nicht mit einem WLAN verbunden und in den Einstellungen ist "Nur über WLAN herunterladen" aktiviert.');
+      return false;
+    }
+  } catch (e) {
+    console.warn('WLAN-Status konnte nicht ermittelt werden', e);
+  }
+  return true;
+}
+
 // Installiert ohne UI (für automatische Updates)
 async function installAppSilently(app) {
   const native = getNativeInstaller();
@@ -706,8 +834,17 @@ async function installAppSilently(app) {
     return;
   }
   if (!(await ensureInstallPermission())) return;
+  if (!(await checkWifiRequirement())) return;
+
   try {
-    await native.downloadAndInstall({ url: app.apkUrl, fileName: `${app.packageName}_${app.versionCode}.apk` });
+    const verifyChecksum = document.getElementById('setting-verify-checksum')?.checked ?? true;
+    const sha256 = (verifyChecksum && app.sha256) ? app.sha256 : '';
+
+    await native.downloadAndInstall({
+      url: app.apkUrl,
+      fileName: `${app.packageName}_${app.versionCode}.apk`,
+      sha256
+    });
     playAudioCue();
     announceSR(`${app.name} wurde auf Version ${app.versionName} aktualisiert.`);
   } catch (e) {
@@ -733,28 +870,38 @@ async function startAppInstall(app) {
   }
 
   if (!(await ensureInstallPermission())) return;
+  if (!(await checkWifiRequirement())) return;
 
-  progressBox.style.display = 'block';
-  progressFill.style.width = '40%';
-  progressLabel.textContent = 'Lade APK im Hintergrund herunter...';
-  actionBtn.disabled = true;
+  if (progressBox) progressBox.style.display = 'block';
+  if (progressFill) progressFill.style.width = '5%';
+  if (progressLabel) progressLabel.textContent = `Verbinde für ${app.name}...`;
+  if (actionBtn) actionBtn.disabled = true;
   announceSR(`Download von ${app.name} gestartet...`);
 
   try {
-    await native.downloadAndInstall({ url: app.apkUrl, fileName: `${app.packageName}_${app.versionCode}.apk` });
-    progressFill.style.width = '100%';
-    progressLabel.textContent = 'Installation läuft...';
+    const verifyChecksum = document.getElementById('setting-verify-checksum')?.checked ?? true;
+    const sha256 = (verifyChecksum && app.sha256) ? app.sha256 : '';
+
+    await native.downloadAndInstall({
+      url: app.apkUrl,
+      fileName: `${app.packageName}_${app.versionCode}.apk`,
+      sha256
+    });
+    if (progressFill) progressFill.style.width = '100%';
+    if (progressLabel) progressLabel.textContent = 'Installation läuft...';
     playAudioCue();
     announceSR(`${app.name} heruntergeladen. Installation wird ausgeführt.`);
   } catch (e) {
-    progressLabel.textContent = 'Fehler beim Herunterladen.';
-    announceSR(`Installation von ${app.name} fehlgeschlagen.`);
+    if (progressLabel) progressLabel.textContent = 'Fehler: ' + (e.message || e);
+    announceSR(`Installation von ${app.name} fehlgeschlagen: ${e.message || e}`);
   }
 
   setTimeout(async () => {
-    actionBtn.disabled = false;
+    if (actionBtn) actionBtn.disabled = false;
     await syncInstalledFromDevice();
-    if (state.selectedApp) openAppDetails(app);
+    if (state.selectedApp && state.selectedApp.packageName === app.packageName) {
+      openAppDetails(app);
+    }
     if (state.currentTab === 'explore') renderExploreList();
     if (state.currentTab === 'updates') renderUpdatesList();
     if (state.currentTab === 'installed') renderInstalledList();
@@ -811,6 +958,13 @@ async function syncAllRepositories(silent = false) {
         const latest = versions.reduce((a, b) => (b.versionCode > a.versionCode ? b : a));
         const apkUrl = `${base}/${latest.apkName}`;
         const sizeMb = latest.size ? `${(latest.size / 1048576).toFixed(1)} MB` : '';
+        const sha256 = latest.hash || latest.sha256 || '';
+
+        // Icon auflösen (URL oder Fallback)
+        let iconUrl = meta.icon ? `${base}/icons/${meta.icon}` : '';
+        if (!iconUrl && meta.iconName) iconUrl = `${base}/icons/${meta.iconName}`;
+
+        const category = (meta.categories && meta.categories.length > 0) ? meta.categories[0].toLowerCase() : (meta.category || 'tools');
 
         const existing = state.apps.find(a => a.packageName === meta.packageName);
         if (existing) {
@@ -821,6 +975,10 @@ async function syncAllRepositories(silent = false) {
             existing.apkUrl = apkUrl;
             if (sizeMb) existing.size = sizeMb;
             existing.repoId = repo.id;
+            if (sha256) existing.sha256 = sha256;
+            if (iconUrl && !existing.icon?.startsWith('data:image')) existing.icon = iconUrl;
+            if (category) existing.category = category;
+            if (meta.changelog) existing.changelog = meta.changelog;
           }
         } else {
           state.apps.push({
@@ -833,13 +991,14 @@ async function syncAllRepositories(silent = false) {
             versionCode: latest.versionCode,
             size: sizeMb || '? MB',
             author: meta.authorName || 'Unbekannt',
-            category: 'tools',
-            icon: '📦',
+            category: category,
+            icon: iconUrl || '📦',
             license: meta.license || 'Open Source',
             repoId: repo.id,
             apkUrl,
+            sha256: sha256,
             sourceUrl: meta.sourceCode || '',
-            changelog: `v${latest.versionName}`
+            changelog: meta.changelog || `v${latest.versionName}`
           });
           changed = true;
         }
@@ -926,37 +1085,57 @@ function setupEventListeners() {
   // Modal Aktionen
   document.getElementById('modal-btn-action').addEventListener('click', () => {
     if (state.selectedApp) {
-      const isInstalled = !!state.installedApps[state.selectedApp.packageName];
+      const isInstalled = !!state.installedApps[state.selectedApp.packageName] ||
+        (state.allDeviceApps && state.allDeviceApps.some(a => a.packageName === state.selectedApp.packageName));
       const updates = getAvailableUpdates();
       const hasUpdate = updates.some(u => u.app.packageName === state.selectedApp.packageName);
       if (hasUpdate || !isInstalled) {
         startAppInstall(state.selectedApp);
       } else {
-        announceSR(`${state.selectedApp.name} wird geöffnet.`);
+        openAppByPackage(state.selectedApp.packageName, state.selectedApp.name);
       }
     }
   });
 
   document.getElementById('modal-btn-uninstall').addEventListener('click', () => {
-    if (state.selectedApp && state.installedApps[state.selectedApp.packageName]) {
-      const name = state.selectedApp.name;
-      delete state.installedApps[state.selectedApp.packageName];
-      saveInstalledApps();
-      closeAppDetails();
-      announceSR(`${name} wurde deinstalliert.`);
-      if (state.currentTab === 'installed') renderInstalledList();
-      if (state.currentTab === 'updates') renderUpdatesList();
-      if (state.currentTab === 'explore') renderExploreList();
+    if (state.selectedApp) {
+      uninstallAppByPackage(state.selectedApp.packageName, state.selectedApp.name);
     }
   });
 
-  // Update All Button
-  document.getElementById('btn-update-all').addEventListener('click', () => {
+  // Filter für installierte Apps (Store vs. Alle Apps auf dem Gerät)
+  const filterSelect = document.getElementById('installed-filter-select');
+  if (filterSelect) {
+    filterSelect.value = state.installedFilter || 'store_only';
+    filterSelect.addEventListener('change', (e) => {
+      state.installedFilter = e.target.value;
+      renderInstalledList();
+      announceSR(e.target.value === 'all_device' ? 'Alle Geräte-Apps werden angezeigt.' : 'Nur Store-Apps werden angezeigt.');
+    });
+  }
+
+  // Update All Button: Sequentielle Warteschlange
+  document.getElementById('btn-update-all').addEventListener('click', async () => {
     const updates = getAvailableUpdates();
-    if (updates.length > 0) {
-      announceSR(`Aktualisiere alle ${updates.length} Apps...`);
-      updates.forEach(u => startAppInstall(u.app));
+    if (updates.length === 0) return;
+
+    const btn = document.getElementById('btn-update-all');
+    btn.disabled = true;
+    announceSR(`Aktualisiere ${updates.length} Apps nacheinander im Hintergrund...`);
+
+    for (let i = 0; i < updates.length; i++) {
+      const u = updates[i];
+      btn.textContent = `⏳ Update ${i + 1}/${updates.length}: ${u.app.name}`;
+      announceSR(`Aktualisiere ${u.app.name} (${i + 1} von ${updates.length})...`);
+      await startAppInstall(u.app);
+      // Kurze Pause zwischen Installationen
+      await new Promise(r => setTimeout(r, 1500));
     }
+
+    btn.disabled = false;
+    btn.textContent = `⚡ Alle aktualisieren`;
+    announceSR('Alle verfügbaren Updates wurden durchgeführt.');
+    renderUpdatesList();
   });
 
   // Check Updates Now Button
@@ -977,7 +1156,7 @@ function setupEventListeners() {
     }
   });
 
-  // Intervall-Änderung speichern & neu planen
+  // Intervall-Änderung speichern & WorkManager / Timer neu planen
   const intervalSel = document.getElementById('setting-update-interval');
   if (intervalSel) {
     intervalSel.value = localStorage.getItem('lauju_store_interval') || '12';
@@ -990,6 +1169,23 @@ function setupEventListeners() {
   if (autoInst) {
     autoInst.checked = localStorage.getItem('lauju_store_auto_install') !== 'false';
     autoInst.addEventListener('change', () => localStorage.setItem('lauju_store_auto_install', String(autoInst.checked)));
+  }
+
+  // WLAN & Checksum Einstellungs-Speicherung
+  const wifiOnlyCheckbox = document.getElementById('setting-wifi-only');
+  if (wifiOnlyCheckbox) {
+    wifiOnlyCheckbox.checked = localStorage.getItem('lauju_store_wifi_only') !== 'false';
+    wifiOnlyCheckbox.addEventListener('change', () => {
+      localStorage.setItem('lauju_store_wifi_only', String(wifiOnlyCheckbox.checked));
+      scheduleAutoUpdates();
+    });
+  }
+  const checksumCheckbox = document.getElementById('setting-verify-checksum');
+  if (checksumCheckbox) {
+    checksumCheckbox.checked = localStorage.getItem('lauju_store_verify_checksum') !== 'false';
+    checksumCheckbox.addEventListener('change', () => {
+      localStorage.setItem('lauju_store_verify_checksum', String(checksumCheckbox.checked));
+    });
   }
 
   // Theme wechseln
@@ -1065,8 +1261,19 @@ async function runAutoUpdateCheck(force = false) {
 
 function scheduleAutoUpdates() {
   if (autoUpdateTimer) clearInterval(autoUpdateTimer);
-  // Alle 15 Minuten prüfen, ob das gewählte Intervall abgelaufen ist
+  // Alle 15 Minuten prüfen, ob das gewählte Intervall abgelaufen ist (solange App offen ist)
   autoUpdateTimer = setInterval(() => runAutoUpdateCheck(false), 15 * 60 * 1000);
+
+  // Nativ über Android WorkManager planen (für Hintergrundprüfungen, auch wenn App beendet ist)
+  const native = getNativeInstaller();
+  if (native && native.scheduleBackgroundUpdateCheck) {
+    const val = document.getElementById('setting-update-interval')?.value || '12';
+    const hours = (val === 'manual') ? 0 : parseInt(val, 10);
+    const wifiOnly = document.getElementById('setting-wifi-only')?.checked ?? true;
+    native.scheduleBackgroundUpdateCheck({ hours, wifiOnly }).catch(e => {
+      console.warn('Native UpdateCheck-Planung fehlgeschlagen:', e);
+    });
+  }
 }
 
 // Start
@@ -1076,6 +1283,29 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderExploreList();
   updateBadgesAndLists();
   announceSR('Lauju Store bereit. 4 Bereiche verfügbar: Entdecken, Installiert, Updates, Einstellungen.');
+
+  // Live-Download-Fortschritt vom nativen Plugin empfangen
+  const native = getNativeInstaller();
+  if (native && native.addListener) {
+    native.addListener('downloadProgress', (info) => {
+      const progressBox = document.getElementById('modal-download-progress');
+      const progressFill = document.getElementById('modal-progress-fill');
+      const progressLabel = document.getElementById('modal-progress-label');
+
+      if (progressBox && info) {
+        progressBox.style.display = 'block';
+        if (info.percent >= 0) {
+          if (progressFill) progressFill.style.width = `${info.percent}%`;
+          const mbDownloaded = (info.downloadedBytes / 1048576).toFixed(1);
+          const mbTotal = info.totalBytes > 0 ? (info.totalBytes / 1048576).toFixed(1) : '?';
+          if (progressLabel) progressLabel.textContent = `Lade herunter... ${info.percent}% (${mbDownloaded} / ${mbTotal} MB)`;
+        } else {
+          if (progressFill) progressFill.style.width = '60%';
+          if (progressLabel) progressLabel.textContent = 'Lade Daten herunter...';
+        }
+      }
+    });
+  }
 
   await syncInstalledFromDevice();
   scheduleAutoUpdates();

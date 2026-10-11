@@ -74,6 +74,13 @@
     <section id="view-installed" class="tab-view" role="tabpanel" aria-labelledby="nav-installed" style="display: none;">
       <div class="section-header-row">
         <h2 class="section-heading">Installierte Apps <span id="installed-count-badge" class="count-badge">0</span></h2>
+        <div class="sort-selector-wrapper">
+          <label for="installed-filter-select" class="sr-only">Anzeige-Filter</label>
+          <select id="installed-filter-select" class="sort-select" aria-label="Filter installierte Apps">
+            <option value="store_only" selected>Nur Store-Apps</option>
+            <option value="all_device">Alle Geräte-Apps</option>
+          </select>
+        </div>
       </div>
       <div id="installed-apps-list" class="apps-grid" role="feed" aria-label="Installierte Anwendungen">
         <!-- Wird dynamisch von app.js befüllt -->
