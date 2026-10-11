@@ -1,6 +1,6 @@
 {
   "name": "barrierefreierappstore_android",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Lauju Store – Moderner, barrierefreier App Store (F-Droid & Neo Store Client)",
   "main": "index.js",
   "scripts": {
