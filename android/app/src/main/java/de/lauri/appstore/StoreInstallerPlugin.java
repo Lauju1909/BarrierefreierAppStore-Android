@@ -229,6 +229,7 @@ public class StoreInstallerPlugin extends Plugin {
         String downloadUrl = call.getString("url");
         String fileName = call.getString("fileName");
         String expectedSha256 = call.getString("sha256");
+        String packageName = call.getString("packageName");
 
         if (downloadUrl == null || downloadUrl.isEmpty()) {
             call.reject("URL darf nicht leer sein");
@@ -241,6 +242,7 @@ public class StoreInstallerPlugin extends Plugin {
 
         final String finalFileName = fileName;
         final String finalUrl = downloadUrl;
+        final String finalPackageName = packageName != null ? packageName : "";
 
         new Thread(() -> {
             try {
@@ -289,6 +291,7 @@ public class StoreInstallerPlugin extends Plugin {
                         progressObj.put("downloadedBytes", downloaded);
                         progressObj.put("totalBytes", totalLength);
                         progressObj.put("fileName", finalFileName);
+                        progressObj.put("packageName", finalPackageName);
                         notifyListeners("downloadProgress", progressObj);
                     }
                 }
@@ -309,11 +312,12 @@ public class StoreInstallerPlugin extends Plugin {
                 }
 
                 // Installation über PackageInstaller-Session (wie Google Play):
-                installWithSession(getContext(), apkFile);
+                installWithSession(getContext(), apkFile, finalPackageName);
 
                 JSObject ret = new JSObject();
                 ret.put("success", true);
                 ret.put("filePath", apkFile.getAbsolutePath());
+                ret.put("packageName", finalPackageName);
                 call.resolve(ret);
             } catch (Exception e) {
                 call.reject("Download/Installation fehlgeschlagen: " + e.getMessage(), e);
@@ -342,10 +346,13 @@ public class StoreInstallerPlugin extends Plugin {
         }
     }
 
-    private void installWithSession(final Context context, File apkFile) throws Exception {
+    private void installWithSession(final Context context, File apkFile, final String packageName) throws Exception {
         android.content.pm.PackageInstaller installer = context.getPackageManager().getPackageInstaller();
         android.content.pm.PackageInstaller.SessionParams params = new android.content.pm.PackageInstaller.SessionParams(
                 android.content.pm.PackageInstaller.SessionParams.MODE_FULL_INSTALL);
+        if (packageName != null && !packageName.isEmpty()) {
+            params.setAppPackageName(packageName);
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             params.setRequireUserAction(android.content.pm.PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED);
         }
@@ -358,6 +365,8 @@ public class StoreInstallerPlugin extends Plugin {
             while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
             session.fsync(out);
         }
+
+        final String action = ACTION_INSTALL_RESULT + "_" + sessionId;
 
         android.content.BroadcastReceiver receiver = new android.content.BroadcastReceiver() {
             @Override
@@ -373,19 +382,21 @@ public class StoreInstallerPlugin extends Plugin {
                 }
                 JSObject ev = new JSObject();
                 ev.put("status", status);
+                ev.put("success", status == android.content.pm.PackageInstaller.STATUS_SUCCESS);
+                ev.put("packageName", packageName);
                 ev.put("message", intent.getStringExtra(android.content.pm.PackageInstaller.EXTRA_STATUS_MESSAGE));
                 notifyListeners("installResult", ev);
                 try { ctx.unregisterReceiver(this); } catch (Exception ignored) {}
             }
         };
-        IntentFilter filter = new IntentFilter(ACTION_INSTALL_RESULT);
+        IntentFilter filter = new IntentFilter(action);
         if (Build.VERSION.SDK_INT >= 33) {
             context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED);
         } else {
             context.registerReceiver(receiver, filter);
         }
 
-        Intent resultIntent = new Intent(ACTION_INSTALL_RESULT).setPackage(context.getPackageName());
+        Intent resultIntent = new Intent(action).setPackage(context.getPackageName());
         int flags = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ? PendingIntent.FLAG_MUTABLE : 0);
         PendingIntent pi = PendingIntent.getBroadcast(context, sessionId, resultIntent, flags);
         session.commit(pi.getIntentSender());

@@ -592,11 +592,20 @@ function getAvailableUpdates() {
   Object.keys(state.installedApps).forEach(pkg => {
     const installed = state.installedApps[pkg];
     const available = state.apps.find(a => a.packageName === pkg);
-    if (available) {
-      const codeNew = available.versionCode || 0;
-      const codeInst = installed.versionCode || 0;
-      if (codeNew > codeInst || available.versionName !== installed.versionName) {
-        updates.push({ app: available, installedVersion: installed.versionName });
+    if (available && installed) {
+      const codeNew = parseInt(available.versionCode, 10) || 0;
+      const codeInst = parseInt(installed.versionCode, 10) || 0;
+      
+      let isUpdate = false;
+      if (codeNew > 0 && codeInst > 0) {
+        isUpdate = codeNew > codeInst;
+      } else if (available.versionName && installed.versionName) {
+        // Fallback falls keine versionCodes vorliegen
+        isUpdate = available.versionName !== installed.versionName;
+      }
+
+      if (isUpdate) {
+        updates.push({ app: available, installedVersion: installed.versionName || '?' });
       }
     }
   });
@@ -826,6 +835,44 @@ async function checkWifiRequirement() {
   return true;
 }
 
+// Hilfsobjekt zur Nachverfolgung ausstehender Installationen
+const pendingInstallResolvers = new Map();
+
+// Globaler Listener für das native installResult Event
+function initNativeInstallListener() {
+  const native = getNativeInstaller();
+  if (native && native.addListener) {
+    native.addListener('installResult', (res) => {
+      console.log('installResult empfangen:', res);
+      const pkg = res.packageName;
+      if (pkg && pendingInstallResolvers.has(pkg)) {
+        const resolver = pendingInstallResolvers.get(pkg);
+        pendingInstallResolvers.delete(pkg);
+        resolver(res);
+      }
+    });
+  }
+}
+
+// Wartet auf das native Ergebnis der Paketinstallation (oder Timeout)
+function waitForInstallResult(packageName, timeoutMs = 25000) {
+  return new Promise((resolve) => {
+    let timer = null;
+    const onResult = (res) => {
+      if (timer) clearTimeout(timer);
+      resolve(res);
+    };
+    pendingInstallResolvers.set(packageName, onResult);
+
+    timer = setTimeout(() => {
+      if (pendingInstallResolvers.has(packageName)) {
+        pendingInstallResolvers.delete(packageName);
+        resolve({ success: false, timeout: true, packageName });
+      }
+    }, timeoutMs);
+  });
+}
+
 // Installiert ohne UI (für automatische Updates)
 async function installAppSilently(app) {
   const native = getNativeInstaller();
@@ -840,11 +887,29 @@ async function installAppSilently(app) {
     const verifyChecksum = document.getElementById('setting-verify-checksum')?.checked ?? true;
     const sha256 = (verifyChecksum && app.sha256) ? app.sha256 : '';
 
+    const installPromise = waitForInstallResult(app.packageName, 30000);
+
     await native.downloadAndInstall({
       url: app.apkUrl,
       fileName: `${app.packageName}_${app.versionCode}.apk`,
-      sha256
+      sha256,
+      packageName: app.packageName
     });
+
+    const result = await installPromise;
+    if (result && result.success) {
+      state.installedApps[app.packageName] = {
+        versionName: app.versionName,
+        versionCode: app.versionCode,
+        name: app.name,
+        iconBase64: app.icon || null,
+        installedAt: Date.now()
+      };
+      saveInstalledApps();
+      await syncInstalledFromDevice();
+      updateBadgesAndLists();
+    }
+
     playAudioCue();
     announceSR(`${app.name} wurde auf Version ${app.versionName} aktualisiert.`);
   } catch (e) {
@@ -882,30 +947,57 @@ async function startAppInstall(app) {
     const verifyChecksum = document.getElementById('setting-verify-checksum')?.checked ?? true;
     const sha256 = (verifyChecksum && app.sha256) ? app.sha256 : '';
 
+    const installPromise = waitForInstallResult(app.packageName, 30000);
+
     await native.downloadAndInstall({
       url: app.apkUrl,
       fileName: `${app.packageName}_${app.versionCode}.apk`,
-      sha256
+      sha256,
+      packageName: app.packageName
     });
+
     if (progressFill) progressFill.style.width = '100%';
-    if (progressLabel) progressLabel.textContent = 'Installation läuft...';
-    playAudioCue();
+    if (progressLabel) progressLabel.textContent = 'Installation läuft auf dem Gerät...';
     announceSR(`${app.name} heruntergeladen. Installation wird ausgeführt.`);
+
+    // Auf die tatsächliche Beendigung der Installation durch das System warten
+    const installRes = await installPromise;
+    playAudioCue();
+
+    // Sofort lokal den Status auf neu aktualisieren
+    state.installedApps[app.packageName] = {
+      versionName: app.versionName,
+      versionCode: app.versionCode,
+      name: app.name,
+      iconBase64: app.icon || null,
+      installedAt: Date.now()
+    };
+    saveInstalledApps();
+
+    if (progressLabel) {
+      if (installRes.success) {
+        progressLabel.textContent = `Erfolgreich auf Version ${app.versionName} aktualisiert!`;
+      } else {
+        progressLabel.textContent = `Installation abgeschlossen.`;
+      }
+    }
+    announceSR(`${app.name} wurde erfolgreich installiert.`);
   } catch (e) {
     if (progressLabel) progressLabel.textContent = 'Fehler: ' + (e.message || e);
     announceSR(`Installation von ${app.name} fehlgeschlagen: ${e.message || e}`);
-  }
-
-  setTimeout(async () => {
+  } finally {
     if (actionBtn) actionBtn.disabled = false;
+    // System-Sync durchführen
     await syncInstalledFromDevice();
+    updateBadgesAndLists();
+
     if (state.selectedApp && state.selectedApp.packageName === app.packageName) {
       openAppDetails(app);
     }
     if (state.currentTab === 'explore') renderExploreList();
     if (state.currentTab === 'updates') renderUpdatesList();
     if (state.currentTab === 'installed') renderInstalledList();
-  }, 4000);
+  }
 }
 
 // 14. Repositories rendern & synchronisieren
@@ -1116,7 +1208,7 @@ function setupEventListeners() {
 
   // Update All Button: Sequentielle Warteschlange
   document.getElementById('btn-update-all').addEventListener('click', async () => {
-    const updates = getAvailableUpdates();
+    let updates = getAvailableUpdates();
     if (updates.length === 0) return;
 
     const btn = document.getElementById('btn-update-all');
@@ -1129,13 +1221,18 @@ function setupEventListeners() {
       announceSR(`Aktualisiere ${u.app.name} (${i + 1} von ${updates.length})...`);
       await startAppInstall(u.app);
       // Kurze Pause zwischen Installationen
-      await new Promise(r => setTimeout(r, 1500));
+      await new Promise(r => setTimeout(r, 1000));
     }
+
+    await syncInstalledFromDevice();
+    updateBadgesAndLists();
+    renderUpdatesList();
+    if (state.currentTab === 'explore') renderExploreList();
+    if (state.currentTab === 'installed') renderInstalledList();
 
     btn.disabled = false;
     btn.textContent = `⚡ Alle aktualisieren`;
-    announceSR('Alle verfügbaren Updates wurden durchgeführt.');
-    renderUpdatesList();
+    announceSR('Alle verfügbaren Updates wurden durchgeführt und Listen aktualisiert.');
   });
 
   // Check Updates Now Button
@@ -1280,6 +1377,7 @@ function scheduleAutoUpdates() {
 document.addEventListener('DOMContentLoaded', async () => {
   loadSettingsAndState();
   setupEventListeners();
+  initNativeInstallListener();
   renderExploreList();
   updateBadgesAndLists();
   announceSR('Lauju Store bereit. 4 Bereiche verfügbar: Entdecken, Installiert, Updates, Einstellungen.');
