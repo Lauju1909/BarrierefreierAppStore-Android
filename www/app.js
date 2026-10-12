@@ -225,10 +225,132 @@ let state = {
   installedFilter: 'store_only',
   repositories: [],
   apps: [],
+  onlineSearchResults: [], // Dynamisch geladene F-Droid / Izzy Online-Ergebnisse
+  isSearchingOnline: false,
   installedApps: {}, // packageName -> { versionName, versionCode, installedAt, name, iconBase64 }
   allDeviceApps: [], // Liste aller installierten Apps vom Gerät
   selectedApp: null
 };
+
+// 4. Übersetzungshilfe: Übersetzt englische Texte live ins Deutsche
+const translationCache = new Map();
+
+function isEnglishOrForeign(text) {
+  if (!text || typeof text !== 'string') return false;
+  // Typische englische Wörter erkennen
+  const enWords = /\b(the|and|for|with|you|this|from|app|your|all|any|can|simple|fast|open|source|free|player|manager|client|tool|files|screen|device|support|remote|control)\b/i;
+  // Typische deutsche Sonderzeichen ausschließen
+  if (/[äöüß]/i.test(text)) return false;
+  return enWords.test(text);
+}
+
+async function translateToGerman(text) {
+  if (!text || typeof text !== 'string') return text;
+  const trimmed = text.trim();
+  if (trimmed.length === 0) return text;
+  if (translationCache.has(trimmed)) return translationCache.get(trimmed);
+
+  const autoTranslateEnabled = document.getElementById('setting-auto-translate')?.checked ?? true;
+  if (!autoTranslateEnabled) return text;
+
+  try {
+    const url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=de&dt=t&q=' + encodeURIComponent(trimmed);
+    const res = await fetch(url);
+    if (!res.ok) return text;
+    const json = await res.json();
+    if (json && json[0] && Array.isArray(json[0])) {
+      const translated = json[0].map(s => s[0]).join('');
+      if (translated) {
+        translationCache.set(trimmed, translated);
+        return translated;
+      }
+    }
+  } catch (e) {
+    console.warn('Übersetzung fehlgeschlagen:', e);
+  }
+  return text;
+}
+
+// Online-Suche in offiziellen Repositories (F-Droid, Izzy)
+let searchDebounceTimer = null;
+
+async function performOnlineRepoSearch(query) {
+  if (!query || query.trim().length < 2) {
+    state.onlineSearchResults = [];
+    state.isSearchingOnline = false;
+    renderExploreList();
+    return;
+  }
+
+  state.isSearchingOnline = true;
+  const q = query.trim();
+
+  try {
+    const res = await fetch(`https://search.f-droid.org/?q=${encodeURIComponent(q)}`);
+    if (!res.ok) {
+      state.isSearchingOnline = false;
+      return;
+    }
+    const html = await res.text();
+    const pattern = /<a class="package-header" href="https:\/\/f-droid\.org\/[^/]+\/packages\/([^"\/]+)">([\s\S]*?)<\/a>/gi;
+    let m;
+    const found = [];
+    const autoTranslate = document.getElementById('setting-auto-translate')?.checked ?? true;
+
+    while ((m = pattern.exec(html)) !== null && found.length < 25) {
+      const pkg = m[1];
+      const block = m[2];
+      const iconMatch = block.match(/<img class="package-icon" src="([^"]+)"/i);
+      const nameMatch = block.match(/<h4 class="package-name">\s*([^<]+)\s*<\/h4>/i);
+      const summaryMatch = block.match(/<span class="package-summary">\s*([^<]+)\s*<\/span>/i);
+      const licenseMatch = block.match(/<span class="package-license">\s*([^<]+)\s*<\/span>/i);
+
+      const rawName = nameMatch ? nameMatch[1].trim() : pkg;
+      let rawSummary = summaryMatch ? summaryMatch[1].trim() : 'F-Droid Open Source Paket';
+
+      // Falls bereits im lokalen Katalog vorhanden, nicht duplizieren
+      if (state.apps.some(a => a.packageName === pkg)) continue;
+
+      found.push({
+        id: pkg,
+        packageName: pkg,
+        name: rawName,
+        summary: rawSummary,
+        rawSummary: rawSummary,
+        description: rawSummary,
+        versionName: 'Neueste',
+        versionCode: 999999,
+        size: 'F-Droid',
+        author: 'F-Droid Community',
+        category: 'tools',
+        icon: iconMatch ? iconMatch[1] : '📦',
+        license: licenseMatch ? licenseMatch[1].trim() : 'GPL / MIT',
+        repoId: 'fdroid',
+        apkUrl: `https://f-droid.org/repo/${pkg}.apk`,
+        sourceUrl: `https://f-droid.org/packages/${pkg}/`,
+        changelog: 'Offizielle F-Droid Version.',
+        isOnlineResult: true
+      });
+    }
+
+    // Automatische deutsche Übersetzung für englische Zusammenfassungen
+    if (autoTranslate) {
+      await Promise.all(found.map(async (item) => {
+        if (isEnglishOrForeign(item.summary)) {
+          item.summary = await translateToGerman(item.summary);
+          item.description = item.summary;
+        }
+      }));
+    }
+
+    state.onlineSearchResults = found;
+  } catch (e) {
+    console.warn('Online-Suche fehlgeschlagen:', e);
+  } finally {
+    state.isSearchingOnline = false;
+    if (state.currentTab === 'explore') renderExploreList();
+  }
+}
 
 // 4. Barrierefreie Screenreader-Ansage
 function announceSR(text) {
@@ -367,10 +489,22 @@ function getTabTitle(tabId) {
 
 // 8. Filterung & Sortierung der Apps
 function getFilteredApps(appsPool) {
-  return appsPool.filter(app => {
-    // Repositories-Filter (Quelle muss aktiv sein)
-    const repo = state.repositories.find(r => r.id === app.repoId);
-    if (repo && !repo.enabled) return false;
+  // Pool kombinieren: Lokaler Katalog + dynamische Online-Suchergebnisse
+  const combined = [...appsPool];
+  if (state.searchQuery.trim() !== '' && state.onlineSearchResults.length > 0) {
+    state.onlineSearchResults.forEach(onl => {
+      if (!combined.some(a => a.packageName === onl.packageName)) {
+        combined.push(onl);
+      }
+    });
+  }
+
+  return combined.filter(app => {
+    // Repositories-Filter (Quelle muss aktiv sein, außer es ist ein dynamisches Suchergebnis)
+    if (!app.isOnlineResult) {
+      const repo = state.repositories.find(r => r.id === app.repoId);
+      if (repo && !repo.enabled) return false;
+    }
 
     // Kategorie-Filter
     if (state.currentCategory !== 'all' && app.category !== state.currentCategory) {
@@ -381,9 +515,10 @@ function getFilteredApps(appsPool) {
     if (state.searchQuery.trim() !== '') {
       const q = state.searchQuery.toLowerCase();
       const matchName = app.name.toLowerCase().includes(q);
-      const matchSummary = app.summary.toLowerCase().includes(q);
+      const matchSummary = (app.summary || '').toLowerCase().includes(q);
+      const matchRawSummary = (app.rawSummary || '').toLowerCase().includes(q);
       const matchPkg = app.packageName.toLowerCase().includes(q);
-      if (!matchName && !matchSummary && !matchPkg) return false;
+      if (!matchName && !matchSummary && !matchRawSummary && !matchPkg) return false;
     }
 
     return true;
@@ -406,7 +541,15 @@ function renderExploreList() {
   countBadge.textContent = `${filtered.length}`;
   container.innerHTML = '';
 
-  if (filtered.length === 0) {
+  if (state.isSearchingOnline) {
+    const searchingBanner = document.createElement('div');
+    searchingBanner.className = 'empty-placeholder';
+    searchingBanner.style.padding = '12px';
+    searchingBanner.innerHTML = `<span>⏳ Durchsuche alle F-Droid Paketquellen nach "${state.searchQuery}"...</span>`;
+    container.appendChild(searchingBanner);
+  }
+
+  if (filtered.length === 0 && !state.isSearchingOnline) {
     container.innerHTML = `
       <div class="empty-placeholder" style="grid-column: 1/-1;">
         <span class="placeholder-icon">🔍</span>
@@ -444,6 +587,15 @@ function renderExploreList() {
         </button>
       </div>
     `;
+
+    card.querySelector('button').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (isInstalled) {
+        openAppByPackage(app.packageName, app.name);
+      } else {
+        openAppDetails(app);
+      }
+    });
 
     card.addEventListener('click', () => openAppDetails(app));
     card.addEventListener('keydown', (e) => {
@@ -552,12 +704,18 @@ function renderInstalledList() {
       </div>
       <div class="app-card-action">
         <button class="btn primary btn-open-card" aria-label="${item.name} starten">Öffnen</button>
+        <button class="btn danger btn-uninstall-card" aria-label="${item.name} deinstallieren" title="Deinstallieren">🗑️</button>
       </div>
     `;
 
     card.querySelector('.btn-open-card').addEventListener('click', (e) => {
       e.stopPropagation();
       openAppByPackage(item.packageName, item.name);
+    });
+
+    card.querySelector('.btn-uninstall-card').addEventListener('click', (e) => {
+      e.stopPropagation();
+      uninstallAppByPackage(item.packageName, item.name);
     });
 
     card.addEventListener('click', () => {
@@ -690,9 +848,10 @@ function updateBadgesAndLists() {
 }
 
 // 12. App-Detailansicht Modal öffnen
-function openAppDetails(app) {
+async function openAppDetails(app) {
   state.selectedApp = app;
-  const isInstalled = !!state.installedApps[app.packageName];
+  const isInstalled = !!state.installedApps[app.packageName] ||
+    (state.allDeviceApps && state.allDeviceApps.some(a => a.packageName === app.packageName));
   const updates = getAvailableUpdates();
   const hasUpdate = updates.some(u => u.app.packageName === app.packageName);
 
@@ -702,7 +861,14 @@ function openAppDetails(app) {
   document.getElementById('modal-app-version').textContent = `v${app.versionName}`;
   document.getElementById('modal-app-size').textContent = app.size || '3.5 MB';
   document.getElementById('modal-app-repo').textContent = getRepoBadge(app.repoId);
-  document.getElementById('modal-app-description').textContent = app.description || app.summary;
+
+  const descEl = document.getElementById('modal-app-description');
+  const transBadge = document.getElementById('modal-translation-badge');
+
+  let rawDesc = app.description || app.summary || 'Keine Beschreibung vorhanden.';
+  descEl.textContent = rawDesc;
+  if (transBadge) transBadge.style.display = 'none';
+
   document.getElementById('modal-app-changelog').textContent = app.changelog || 'Fehlerbehebungen und Leistungsoptimierungen.';
   document.getElementById('modal-app-package').textContent = app.packageName;
   document.getElementById('modal-app-license').textContent = app.license || 'MIT / Open Source';
@@ -720,7 +886,7 @@ function openAppDetails(app) {
     actionBtn.className = 'btn outline btn-large';
     uninstallBtn.style.display = 'inline-flex';
   } else {
-    actionBtn.textContent = '📥 Installieren (' + app.size + ')';
+    actionBtn.textContent = '📥 Installieren (' + (app.size || 'F-Droid') + ')';
     actionBtn.className = 'btn primary btn-large';
     uninstallBtn.style.display = 'none';
   }
@@ -732,6 +898,53 @@ function openAppDetails(app) {
   const modal = document.getElementById('app-detail-modal');
   modal.style.display = 'flex';
   announceSR(`App-Details für ${app.name} geöffnet.`);
+
+  // Falls es sich um ein Online-Suchergebnis handelt, lade reale APK-URL & Details aus f-droid.org
+  if (app.isOnlineResult && (!app.realDetailsLoaded)) {
+    try {
+      const res = await fetch(`https://f-droid.org/en/packages/${app.packageName}/`);
+      if (res.ok) {
+        const pageHtml = await res.text();
+        const fullDescMatch = pageHtml.match(/<div class="package-description"[^>]*>([\s\S]*?)<\/div>/i);
+        const apkMatch = pageHtml.match(/<a href="([^"]+\.apk)">/i);
+        const versionMatch = pageHtml.match(/<b>Version\s+([^<]+)<\/b>/i);
+
+        if (apkMatch && apkMatch[1]) {
+          app.apkUrl = apkMatch[1];
+        }
+        if (versionMatch && versionMatch[1]) {
+          app.versionName = versionMatch[1].trim();
+          document.getElementById('modal-app-version').textContent = `v${app.versionName}`;
+        }
+        if (fullDescMatch && fullDescMatch[1]) {
+          const cleanDesc = fullDescMatch[1].replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').trim();
+          if (cleanDesc) {
+            rawDesc = cleanDesc;
+            app.description = cleanDesc;
+          }
+        }
+        app.realDetailsLoaded = true;
+      }
+    } catch (e) {
+      console.warn('Laden der Detailseite fehlgeschlagen:', e);
+    }
+  }
+
+  // Automatische Übersetzung ins Deutsche bei englischem Text
+  const autoTranslate = document.getElementById('setting-auto-translate')?.checked ?? true;
+  if (autoTranslate && isEnglishOrForeign(rawDesc)) {
+    if (transBadge) {
+      transBadge.style.display = 'inline-block';
+      transBadge.textContent = '⏳ Übersetze auf Deutsch...';
+    }
+    const germanDesc = await translateToGerman(rawDesc);
+    if (state.selectedApp && state.selectedApp.packageName === app.packageName) {
+      descEl.textContent = germanDesc;
+      if (transBadge) {
+        transBadge.textContent = '🇩🇪 Auf Deutsch übersetzt';
+      }
+    }
+  }
 }
 
 function closeAppDetails() {
@@ -1137,10 +1350,23 @@ function setupEventListeners() {
     clearBtn.style.display = state.searchQuery ? 'block' : 'none';
     if (state.currentTab === 'explore') renderExploreList();
     if (state.currentTab === 'installed') renderInstalledList();
+
+    // Debounce für Online-Suche in offiziellen Repositories
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+    if (state.currentTab === 'explore' && state.searchQuery.trim().length >= 2) {
+      searchDebounceTimer = setTimeout(() => {
+        performOnlineRepoSearch(state.searchQuery);
+      }, 500);
+    } else {
+      state.onlineSearchResults = [];
+      state.isSearchingOnline = false;
+    }
   });
   clearBtn.addEventListener('click', () => {
     searchInput.value = '';
     state.searchQuery = '';
+    state.onlineSearchResults = [];
+    state.isSearchingOnline = false;
     clearBtn.style.display = 'none';
     searchInput.focus();
     if (state.currentTab === 'explore') renderExploreList();
@@ -1282,6 +1508,16 @@ function setupEventListeners() {
     checksumCheckbox.checked = localStorage.getItem('lauju_store_verify_checksum') !== 'false';
     checksumCheckbox.addEventListener('change', () => {
       localStorage.setItem('lauju_store_verify_checksum', String(checksumCheckbox.checked));
+    });
+  }
+
+  // Auto-Translate Einstellungs-Speicherung
+  const autoTranslateCheckbox = document.getElementById('setting-auto-translate');
+  if (autoTranslateCheckbox) {
+    autoTranslateCheckbox.checked = localStorage.getItem('lauju_store_auto_translate') !== 'false';
+    autoTranslateCheckbox.addEventListener('change', () => {
+      localStorage.setItem('lauju_store_auto_translate', String(autoTranslateCheckbox.checked));
+      announceSR(autoTranslateCheckbox.checked ? 'Automatische deutsche Übersetzung aktiviert.' : 'Automatische Übersetzung deaktiviert.');
     });
   }
 

@@ -220,6 +220,17 @@
             <span class="toggle-slider"></span>
           </label>
         </div>
+
+        <div class="setting-row">
+          <div class="setting-label-box">
+            <span class="setting-name">Englische App-Beschreibungen übersetzen</span>
+            <span class="setting-desc">Übersetzt englische App-Titel, Zusammenfassungen und Beschreibungen automatisch live auf Deutsch.</span>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="setting-auto-translate" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
       </div>
 
       <!-- Gruppe 5: Design & Erscheinungsbild -->
@@ -316,7 +327,10 @@
 
         <!-- Beschreibung & Details -->
         <div class="modal-section">
-          <h3 class="modal-section-title">Beschreibung</h3>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <h3 class="modal-section-title" style="margin-bottom: 0;">Beschreibung</h3>
+            <span id="modal-translation-badge" class="count-badge" style="display: none; background: rgba(56, 189, 248, 0.2); color: var(--md-sys-color-primary);">🇩🇪 Auf Deutsch übersetzt</span>
+          </div>
           <p id="modal-app-description" class="modal-desc-text">Ausführliche Beschreibung...</p>
         </div>
 
