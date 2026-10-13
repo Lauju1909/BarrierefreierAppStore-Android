@@ -129,9 +129,29 @@
           <!-- Dynamisch befüllt -->
         </div>
 
-        <button id="btn-add-repo" class="btn primary" style="margin-top: 14px; width: 100%;">
-          ➕ Neue Paketquelle hinzufügen
-        </button>
+        <div style="display: flex; gap: 8px; margin-top: 14px;">
+          <button id="btn-add-repo" class="btn primary" style="flex: 1;">
+            ➕ Quelle hinzufügen
+          </button>
+          <a id="btn-open-dev-portal" href="https://lauju1909.github.io/fdroid-repo/" target="_blank" rel="noopener" class="btn outline" style="flex: 1; text-align: center; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 6px;">
+            🌐 App veröffentlichen
+          </a>
+        </div>
+      </div>
+
+      <!-- Gruppe 1b: Beta- & Entwickler-Optionen -->
+      <div class="settings-group">
+        <h3 class="settings-group-title">🧪 Beta- &amp; Testversionen</h3>
+        <div class="setting-row">
+          <div class="setting-label-box">
+            <span class="setting-name">Beta-Versionen anzeigen</span>
+            <span class="setting-desc">Ermöglicht das Ausprobieren und Testen von Vorabversionen (Pre-Releases).</span>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="setting-show-beta">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
       </div>
 
       <!-- Gruppe 2: Automatische Updates -->
@@ -307,11 +327,14 @@
           </div>
         </div>
 
-        <!-- Aktions-Button: Installieren / Öffnen / Aktualisieren -->
-        <div class="modal-action-bar">
-          <button id="modal-btn-action" class="btn primary btn-large" aria-label="App herunterladen und installieren">
+        <!-- Aktions-Button: Installieren / Öffnen / Aktualisieren / Kaufen / Spenden -->
+        <div class="modal-action-bar" style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button id="modal-btn-action" class="btn primary btn-large" style="flex: 2; min-width: 140px;" aria-label="App herunterladen und installieren">
             📥 Installieren
           </button>
+          <a id="modal-btn-pay" href="#" target="_blank" rel="noopener" class="btn outline btn-large" style="display: none; flex: 1.5; min-width: 140px; text-decoration: none; align-items: center; justify-content: center; gap: 6px;">
+            💰 Kaufen
+          </a>
           <button id="modal-btn-uninstall" class="btn danger" style="display: none;" aria-label="App deinstallieren">
             🗑️ Deinstallieren
           </button>

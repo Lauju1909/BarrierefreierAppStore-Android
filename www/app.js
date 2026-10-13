@@ -166,17 +166,41 @@ const INITIAL_APPS = [
     name: 'Lauju Store',
     summary: 'Dieser barrierefreie Open-Source App Store (F-Droid & Neo Store Client)',
     description: 'Der moderne, barrierefreie Store für alle deine Android-Anwendungen. Unterstützt F-Droid Repositories, automatische Update-Prüfung, TalkBack-Optimierung und Google Play Protect Konformität.',
-    versionName: '1.0.0',
-    versionCode: 1,
+    versionName: '1.0.5',
+    versionCode: 6,
     size: '3.8 MB',
     author: 'Laurin Schneider',
     category: 'tools',
     icon: '🏪',
     license: 'MIT',
     repoId: 'lauju',
+    paymentType: 'donation',
+    price: '',
+    paymentUrl: 'https://ko-fi.com/lauju1909',
     apkUrl: 'https://github.com/Lauju1909/BarrierefreierAppStore-Android/releases/latest/download/app-release-unsigned.apk',
     sourceUrl: 'https://github.com/Lauju1909/BarrierefreierAppStore-Android',
-    changelog: 'v1.0.0: Erste Veröffentlichung des modernen barrierefreien App Stores.'
+    changelog: 'v1.0.5: Paketquellen-Suche, App-Deinstallation, automatische Übersetzungen & Zahlungsunterstützung.'
+  },
+  {
+    id: 'dokumentenbetrachter',
+    packageName: 'de.lauri.dokumentenbetrachter',
+    name: 'Dokumenten-Betrachter Barrierefrei',
+    summary: 'Barrierefreier Office-Viewer für LibreOffice (ODT, ODS), Word (DOCX), PDF und Text',
+    description: 'Speziell für Menschen mit Blindheit und Sehbehinderung entwickelt: Wandelt Office-Dokumente und Tabellen in semantische Textstrukturen mit TalkBack-Navigation und Sprachausgabe um.',
+    versionName: '1.0.0',
+    versionCode: 1,
+    size: '3.5 MB',
+    author: 'Laurin Schneider',
+    category: 'tools',
+    icon: '📄',
+    license: 'MIT',
+    repoId: 'lauju',
+    paymentType: 'donation',
+    price: '',
+    paymentUrl: 'https://ko-fi.com/lauju1909',
+    apkUrl: 'https://github.com/Lauju1909/BarrierefreierDokumentenBetrachter-Android/releases/latest/download/app-release-unsigned.apk',
+    sourceUrl: 'https://github.com/Lauju1909/BarrierefreierDokumentenBetrachter-Android',
+    changelog: 'v1.0.0: Erste Veröffentlichung für barrierefreie Office- und PDF-Dokumente.'
   },
   {
     id: 'newpipe',
@@ -521,6 +545,12 @@ function getFilteredApps(appsPool) {
       if (!matchName && !matchSummary && !matchRawSummary && !matchPkg) return false;
     }
 
+    // Beta-Versionen Filter (nur anzeigen, wenn Schalter aktiv ist)
+    const showBeta = document.getElementById('setting-show-beta')?.checked ?? false;
+    if (app.isBeta && !showBeta) {
+      return false;
+    }
+
     return true;
   }).sort((a, b) => {
     if (state.currentSort === 'name') {
@@ -579,6 +609,9 @@ function renderExploreList() {
           <span>${app.size}</span>
           <span>•</span>
           <span>${getRepoBadge(app.repoId)}</span>
+          ${app.paymentType === 'paid' ? `<span>•</span><span style="color: #f0883e; font-weight: bold;">💰 ${app.price || 'Kauf'}</span>` : ''}
+          ${app.paymentType === 'donation' ? `<span>•</span><span style="color: #d29922; font-weight: bold;">☕ Spende</span>` : ''}
+          ${app.isBeta ? `<span>•</span><span style="color: #8957e5; font-weight: bold;">🧪 Beta</span>` : ''}
         </div>
       </div>
       <div class="app-card-action">
@@ -876,6 +909,7 @@ async function openAppDetails(app) {
 
   const actionBtn = document.getElementById('modal-btn-action');
   const uninstallBtn = document.getElementById('modal-btn-uninstall');
+  const payBtn = document.getElementById('modal-btn-pay');
 
   if (hasUpdate) {
     actionBtn.textContent = '🔄 Auf v' + app.versionName + ' aktualisieren';
@@ -889,6 +923,24 @@ async function openAppDetails(app) {
     actionBtn.textContent = '📥 Installieren (' + (app.size || 'F-Droid') + ')';
     actionBtn.className = 'btn primary btn-large';
     uninstallBtn.style.display = 'none';
+  }
+
+  // Bezahl- / Spenden-Button konfigurieren (Weg 1 & Weg 3)
+  if (payBtn) {
+    if (app.paymentUrl) {
+      payBtn.style.display = 'inline-flex';
+      payBtn.href = app.paymentUrl;
+      if (app.paymentType === 'paid') {
+        const pr = app.price ? ` (${app.price})` : '';
+        payBtn.textContent = `💰 Kaufen${pr}`;
+        payBtn.className = 'btn primary btn-large';
+      } else {
+        payBtn.textContent = '☕ Spenden / Unterstützen';
+        payBtn.className = 'btn outline btn-large';
+      }
+    } else {
+      payBtn.style.display = 'none';
+    }
   }
 
   // Fortschrittsbalken zurücksetzen
@@ -1284,6 +1336,10 @@ async function syncAllRepositories(silent = false) {
             if (iconUrl && !existing.icon?.startsWith('data:image')) existing.icon = iconUrl;
             if (category) existing.category = category;
             if (meta.changelog) existing.changelog = meta.changelog;
+            if (meta.paymentUrl) existing.paymentUrl = meta.paymentUrl;
+            if (meta.paymentType) existing.paymentType = meta.paymentType;
+            if (meta.price) existing.price = meta.price;
+            if (meta.isBeta !== undefined) existing.isBeta = meta.isBeta;
           }
         } else {
           state.apps.push({
@@ -1302,6 +1358,10 @@ async function syncAllRepositories(silent = false) {
             repoId: repo.id,
             apkUrl,
             sha256: sha256,
+            paymentType: meta.paymentType || 'free',
+            price: meta.price || '',
+            paymentUrl: meta.paymentUrl || '',
+            isBeta: !!meta.isBeta || latest.versionName?.toLowerCase().includes('beta'),
             sourceUrl: meta.sourceCode || '',
             changelog: meta.changelog || `v${latest.versionName}`
           });
@@ -1518,6 +1578,17 @@ function setupEventListeners() {
     autoTranslateCheckbox.addEventListener('change', () => {
       localStorage.setItem('lauju_store_auto_translate', String(autoTranslateCheckbox.checked));
       announceSR(autoTranslateCheckbox.checked ? 'Automatische deutsche Übersetzung aktiviert.' : 'Automatische Übersetzung deaktiviert.');
+    });
+  }
+
+  // Beta-Versionen Einstellungs-Speicherung
+  const showBetaCheckbox = document.getElementById('setting-show-beta');
+  if (showBetaCheckbox) {
+    showBetaCheckbox.checked = localStorage.getItem('lauju_store_show_beta') === 'true';
+    showBetaCheckbox.addEventListener('change', () => {
+      localStorage.setItem('lauju_store_show_beta', String(showBetaCheckbox.checked));
+      announceSR(showBetaCheckbox.checked ? 'Beta-Versionen werden jetzt im Store angezeigt.' : 'Beta-Versionen ausgeblendet.');
+      renderExploreList();
     });
   }
 
