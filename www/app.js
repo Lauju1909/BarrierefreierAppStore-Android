@@ -1634,6 +1634,135 @@ function setupEventListeners() {
       announceSR(`Paketquelle ${name} erfolgreich hinzugefügt.`);
     }
   });
+
+  // Modal: In-App Publisher Hub
+  const btnOpenPub = document.getElementById('btn-open-publisher-modal');
+  const pubModal = document.getElementById('publisher-modal');
+  const btnClosePub = document.getElementById('btn-close-publisher-modal');
+  const pubForm = document.getElementById('inapp-publisher-form');
+  const pubPaymentSelect = document.getElementById('pub-payment-type');
+
+  if (btnOpenPub && pubModal) {
+    btnOpenPub.addEventListener('click', () => {
+      pubModal.style.display = 'flex';
+      renderPublisherSavedList();
+      announceSR('App-Einreichungs-Portal geöffnet.');
+    });
+    btnClosePub.addEventListener('click', () => {
+      pubModal.style.display = 'none';
+    });
+
+    pubPaymentSelect.addEventListener('change', () => {
+      const v = pubPaymentSelect.value;
+      document.getElementById('pub-row-price').style.display = (v === 'paid') ? 'block' : 'none';
+      document.getElementById('pub-row-payment-url').style.display = (v === 'paid' || v === 'donation') ? 'block' : 'none';
+    });
+
+    document.getElementById('btn-pub-check').addEventListener('click', async () => {
+      const repoUrl = document.getElementById('pub-github-repo').value.trim();
+      if (!repoUrl) return alert('Bitte zuerst eine GitHub URL eingeben.');
+      const clean = repoUrl.replace('https://github.com/', '').replace(/\/+$/, '');
+      try {
+        announceSR('Prüfe GitHub Repository...');
+        const res = await fetch(`https://api.github.com/repos/${clean}`);
+        if (!res.ok) throw new Error('Repository nicht gefunden');
+        const data = await res.json();
+        document.getElementById('pub-preview-name').textContent = data.name;
+        document.getElementById('pub-preview-ver').textContent = data.default_branch || 'main';
+        document.getElementById('pub-preview-box').style.display = 'block';
+        announceSR(`Repository ${data.name} gefunden.`);
+      } catch (e) {
+        alert('Fehler beim Abrufen der GitHub-Daten: ' + e.message);
+      }
+    });
+
+    pubForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const repoUrl = document.getElementById('pub-github-repo').value.trim();
+      const cleanRepo = repoUrl.replace('https://github.com/', '').replace(/\/+$/, '');
+      const paymentType = pubPaymentSelect.value;
+      const price = document.getElementById('pub-price').value.trim();
+      const paymentUrl = document.getElementById('pub-payment-url').value.trim();
+      const isBeta = document.getElementById('pub-is-beta').checked;
+
+      // Lokal in der Store-App merken
+      const myApps = JSON.parse(localStorage.getItem('lauju_my_published_apps') || '[]');
+      const newEntry = {
+        repo: cleanRepo,
+        name: document.getElementById('pub-preview-name').textContent || cleanRepo,
+        paymentType,
+        price,
+        paymentUrl,
+        isBeta,
+        submittedAt: Date.now()
+      };
+      
+      const exIdx = myApps.findIndex(a => a.repo.toLowerCase() === cleanRepo.toLowerCase());
+      if (exIdx >= 0) {
+        myApps[exIdx] = newEntry;
+      } else {
+        myApps.push(newEntry);
+      }
+      localStorage.setItem('lauju_my_published_apps', JSON.stringify(myApps));
+      renderPublisherSavedList();
+
+      // GitHub Issue-Link öffnen für offizielle Freischaltung
+      const title = `[App Einreichung / Update] ${cleanRepo}`;
+      const body = `### App Einreichung aus Lauju Store\\n\\n` +
+                   `- **Repo:** https://github.com/${cleanRepo}\\n` +
+                   `- **Modell:** ${paymentType}\\n` +
+                   `- **Preis:** ${price || 'Kostenlos'}\\n` +
+                   `- **Zahlungslink:** ${paymentUrl || 'Keiner'}\\n` +
+                   `- **Beta:** ${isBeta ? 'Ja' : 'Nein'}\\n\\n` +
+                   `*Eingereicht direkt über die Lauju Store Android App.*`;
+
+      const issueUrl = `https://github.com/Lauju1909/fdroid-repo/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
+      window.open(issueUrl, '_blank');
+      announceSR('Einreichung gespeichert und Freigabe-Antrag auf GitHub geöffnet.');
+      alert('Deine Einreichung wurde lokal gespeichert und das GitHub-Fenster zur Freischaltung geöffnet!');
+    });
+  }
+}
+
+function renderPublisherSavedList() {
+  const container = document.getElementById('pub-saved-list');
+  if (!container) return;
+  const list = JSON.parse(localStorage.getItem('lauju_my_published_apps') || '[]');
+  container.innerHTML = '';
+
+  if (list.length === 0) {
+    container.innerHTML = '<p style="color: var(--md-sys-color-on-surface-variant); font-size: 13px;">Noch keine Apps lokal eingereicht.</p>';
+    return;
+  }
+
+  list.forEach((item, idx) => {
+    const el = document.createElement('div');
+    el.style.cssText = 'padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px; display: flex; justify-content: space-between; align-items: center;';
+    el.innerHTML = `
+      <div>
+        <strong style="font-size: 14px;">${item.name}</strong>
+        <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant);">${item.repo} • ${item.paymentType} ${item.price ? '(' + item.price + ')' : ''} ${item.isBeta ? '• 🧪 Beta' : ''}</div>
+      </div>
+      <button class="btn outline" style="font-size: 12px; padding: 4px 8px;">✏️ Laden</button>
+    `;
+
+    el.querySelector('button').addEventListener('click', () => {
+      document.getElementById('pub-github-repo').value = 'https://github.com/' + item.repo;
+      document.getElementById('pub-payment-type').value = item.paymentType || 'free';
+      document.getElementById('pub-price').value = item.price || '';
+      document.getElementById('pub-payment-url').value = item.paymentUrl || '';
+      document.getElementById('pub-is-beta').checked = !!item.isBeta;
+      const v = item.paymentType;
+      document.getElementById('pub-row-price').style.display = (v === 'paid') ? 'block' : 'none';
+      document.getElementById('pub-row-payment-url').style.display = (v === 'paid' || v === 'donation') ? 'block' : 'none';
+      document.getElementById('pub-preview-name').textContent = item.name;
+      document.getElementById('pub-preview-ver').textContent = 'Lokal gespeichert';
+      document.getElementById('pub-preview-box').style.display = 'block';
+      announceSR(`Daten für ${item.name} in das Formular geladen.`);
+    });
+
+    container.appendChild(el);
+  });
 }
 
 // 16. Automatische Update-Prüfung im Hintergrund

@@ -129,12 +129,15 @@
           <!-- Dynamisch befüllt -->
         </div>
 
-        <div style="display: flex; gap: 8px; margin-top: 14px;">
-          <button id="btn-add-repo" class="btn primary" style="flex: 1;">
+        <div style="display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap;">
+          <button id="btn-add-repo" class="btn primary" style="flex: 1; min-width: 140px;">
             ➕ Quelle hinzufügen
           </button>
-          <a id="btn-open-dev-portal" href="https://lauju1909.github.io/fdroid-repo/" target="_blank" rel="noopener" class="btn outline" style="flex: 1; text-align: center; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 6px;">
-            🌐 App veröffentlichen
+          <button id="btn-open-publisher-modal" class="btn primary" style="flex: 1; min-width: 140px;">
+            🚀 App einreichen (In-App)
+          </button>
+          <a id="btn-open-dev-portal" href="https://lauju1909.github.io/fdroid-repo/" target="_blank" rel="noopener" class="btn outline" style="flex: 1; min-width: 140px; text-align: center; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 6px;">
+            🌐 Web-Portal
           </a>
         </div>
       </div>
@@ -417,6 +420,73 @@
             Hinzufügen &amp; Laden
           </button>
         </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: App veröffentlichen & verwalten (In-App Publisher Hub) -->
+  <div id="publisher-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="publisher-modal-title" style="display: none;">
+    <div class="modal-sheet" style="max-height: 90vh; overflow-y: auto;">
+      <div class="modal-header">
+        <h2 id="publisher-modal-title" class="modal-title">🚀 App einreichen &amp; verwalten</h2>
+        <button id="btn-close-publisher-modal" class="icon-btn close-modal-btn" aria-label="Schließen">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="color: var(--md-sys-color-on-surface-variant); font-size: 14px; margin-bottom: 16px;">
+          Gib einfach die GitHub-URL deiner App ein. Du musst keine F-Droid-Struktur anlegen.
+        </p>
+
+        <form id="inapp-publisher-form">
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label for="pub-github-repo" style="font-weight: 600; display: block; margin-bottom: 4px;">GitHub Repository Link:</label>
+            <div style="display: flex; gap: 6px;">
+              <input type="text" id="pub-github-repo" class="form-input" placeholder="https://github.com/Benutzer/App" required style="flex: 1;">
+              <button type="button" id="btn-pub-check" class="btn outline" style="white-space: nowrap;">🔍 Prüfen</button>
+            </div>
+          </div>
+
+          <div id="pub-preview-box" style="display: none; padding: 12px; background: rgba(56, 189, 248, 0.1); border: 1px solid var(--md-sys-color-primary); border-radius: 8px; margin-bottom: 14px;">
+            <p><strong>Name:</strong> <span id="pub-preview-name">-</span></p>
+            <p><strong>Version:</strong> <span id="pub-preview-ver">-</span></p>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label for="pub-payment-type" style="font-weight: 600; display: block; margin-bottom: 4px;">Bezahlmodell:</label>
+            <select id="pub-payment-type" class="setting-select" style="width: 100%;">
+              <option value="free">Kostenlos</option>
+              <option value="donation">Freiwillige Spende (Pay-What-You-Want)</option>
+              <option value="paid">Kauf-App (Fester Preis)</option>
+            </select>
+          </div>
+
+          <div id="pub-row-price" class="form-group" style="margin-bottom: 14px; display: none;">
+            <label for="pub-price" style="font-weight: 600; display: block; margin-bottom: 4px;">Preis (z. B. 2,99 €):</label>
+            <input type="text" id="pub-price" class="form-input" placeholder="2,99 €">
+          </div>
+
+          <div id="pub-row-payment-url" class="form-group" style="margin-bottom: 14px; display: none;">
+            <label for="pub-payment-url" style="font-weight: 600; display: block; margin-bottom: 4px;">Zahlungslink (PayPal.me / Ko-fi):</label>
+            <input type="url" id="pub-payment-url" class="form-input" placeholder="https://paypal.me/DeinName">
+          </div>
+
+          <div class="form-group" style="margin-bottom: 18px;">
+            <label style="display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer;">
+              <input type="checkbox" id="pub-is-beta" style="width: 20px; height: 20px;">
+              <span>🧪 Als Beta-Version markieren</span>
+            </label>
+          </div>
+
+          <button type="submit" class="btn primary btn-large" style="width: 100%;">
+            ✅ App jetzt einreichen (GitHub Antrag)
+          </button>
+        </form>
+
+        <div style="margin-top: 24px; border-top: 1px solid var(--md-sys-color-surface-variant); padding-top: 14px;">
+          <h3 style="font-size: 15px; margin-bottom: 8px;">Deine lokal gespeicherten Einreichungen:</h3>
+          <div id="pub-saved-list" style="display: flex; flex-direction: column; gap: 8px;">
+            <!-- Dynamisch befüllt -->
+          </div>
+        </div>
       </div>
     </div>
   </div>
