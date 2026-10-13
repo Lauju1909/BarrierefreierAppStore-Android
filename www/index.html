@@ -60,6 +60,10 @@
             <option value="featured">Empfohlene</option>
             <option value="name">Name (A-Z)</option>
             <option value="updated">Neueste Version</option>
+            <option value="filter_free">Nur Kostenlose</option>
+            <option value="filter_paid">Nur Kauf-Apps</option>
+            <option value="filter_donation">Nur Spenden-Apps</option>
+            <option value="filter_beta">Nur Beta-Apps</option>
           </select>
         </div>
       </div>
@@ -446,8 +450,44 @@
           </div>
 
           <div id="pub-preview-box" style="display: none; padding: 12px; background: rgba(56, 189, 248, 0.1); border: 1px solid var(--md-sys-color-primary); border-radius: 8px; margin-bottom: 14px;">
-            <p><strong>Name:</strong> <span id="pub-preview-name">-</span></p>
+            <p><strong>Erkannter Name:</strong> <span id="pub-preview-name">-</span></p>
             <p><strong>Version:</strong> <span id="pub-preview-ver">-</span></p>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label for="pub-name" style="font-weight: 600; display: block; margin-bottom: 4px;">App-Name:</label>
+            <input type="text" id="pub-name" class="form-input" placeholder="Mein App Name" required>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label for="pub-package" style="font-weight: 600; display: block; margin-bottom: 4px;">Paket-ID (applicationId):</label>
+            <input type="text" id="pub-package" class="form-input" placeholder="de.meinname.app" required>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label for="pub-summary" style="font-weight: 600; display: block; margin-bottom: 4px;">Kurzbeschreibung (1 Satz):</label>
+            <input type="text" id="pub-summary" class="form-input" placeholder="Barrierefreie Anwendung für Android..." required>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label for="pub-desc" style="font-weight: 600; display: block; margin-bottom: 4px;">Ausführliche Beschreibung:</label>
+            <textarea id="pub-desc" class="form-input" rows="3" placeholder="Detaillierte Features, TalkBack-Funktionen..."></textarea>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label for="pub-icon" style="font-weight: 600; display: block; margin-bottom: 4px;">Icon URL oder Emoji (Optional):</label>
+            <input type="text" id="pub-icon" class="form-input" placeholder="📱 oder https://raw.githubusercontent.com/.../icon.png">
+          </div>
+
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label for="pub-category" style="font-weight: 600; display: block; margin-bottom: 4px;">Kategorie:</label>
+            <select id="pub-category" class="setting-select" style="width: 100%;">
+              <option value="accessibility">♿ Barrierefreiheit</option>
+              <option value="tools" selected>🛠️ Werkzeuge</option>
+              <option value="productivity">💰 Finanzen &amp; Alltag</option>
+              <option value="education">🎓 Lernen &amp; Schule</option>
+              <option value="games">🎮 Spiele</option>
+            </select>
           </div>
 
           <div class="form-group" style="margin-bottom: 14px;">

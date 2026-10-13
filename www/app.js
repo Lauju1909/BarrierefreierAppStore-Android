@@ -547,9 +547,15 @@ function getFilteredApps(appsPool) {
 
     // Beta-Versionen Filter (nur anzeigen, wenn Schalter aktiv ist)
     const showBeta = document.getElementById('setting-show-beta')?.checked ?? false;
-    if (app.isBeta && !showBeta) {
+    if (app.isBeta && !showBeta && state.currentSort !== 'filter_beta') {
       return false;
     }
+
+    // Zusätzlicher Modus-Filter (Kostenlos, Kauf, Spende, Beta)
+    if (state.currentSort === 'filter_free' && app.paymentType && app.paymentType !== 'free') return false;
+    if (state.currentSort === 'filter_paid' && app.paymentType !== 'paid') return false;
+    if (state.currentSort === 'filter_donation' && app.paymentType !== 'donation') return false;
+    if (state.currentSort === 'filter_beta' && !app.isBeta) return false;
 
     return true;
   }).sort((a, b) => {
@@ -1670,7 +1676,18 @@ function setupEventListeners() {
         document.getElementById('pub-preview-name').textContent = data.name;
         document.getElementById('pub-preview-ver').textContent = data.default_branch || 'main';
         document.getElementById('pub-preview-box').style.display = 'block';
-        announceSR(`Repository ${data.name} gefunden.`);
+
+        // Felder automatisch vorausfüllen, falls noch leer
+        if (!document.getElementById('pub-name').value) document.getElementById('pub-name').value = data.name;
+        if (!document.getElementById('pub-summary').value && data.description) document.getElementById('pub-summary').value = data.description;
+        if (!document.getElementById('pub-desc').value && data.description) document.getElementById('pub-desc').value = data.description;
+        if (!document.getElementById('pub-icon').value) document.getElementById('pub-icon').value = `https://raw.githubusercontent.com/${clean}/main/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png`;
+        if (!document.getElementById('pub-package').value) {
+          const autoPkg = 'de.lauri.' + data.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+          document.getElementById('pub-package').value = autoPkg;
+        }
+
+        announceSR(`Repository ${data.name} geladen und Formularfelder vorausgefüllt.`);
       } catch (e) {
         alert('Fehler beim Abrufen der GitHub-Daten: ' + e.message);
       }
@@ -1680,6 +1697,12 @@ function setupEventListeners() {
       e.preventDefault();
       const repoUrl = document.getElementById('pub-github-repo').value.trim();
       const cleanRepo = repoUrl.replace('https://github.com/', '').replace(/\/+$/, '');
+      const name = document.getElementById('pub-name').value.trim();
+      const pkg = document.getElementById('pub-package').value.trim();
+      const summary = document.getElementById('pub-summary').value.trim();
+      const desc = document.getElementById('pub-desc').value.trim();
+      const icon = document.getElementById('pub-icon').value.trim();
+      const category = document.getElementById('pub-category').value;
       const paymentType = pubPaymentSelect.value;
       const price = document.getElementById('pub-price').value.trim();
       const paymentUrl = document.getElementById('pub-payment-url').value.trim();
@@ -1689,7 +1712,12 @@ function setupEventListeners() {
       const myApps = JSON.parse(localStorage.getItem('lauju_my_published_apps') || '[]');
       const newEntry = {
         repo: cleanRepo,
-        name: document.getElementById('pub-preview-name').textContent || cleanRepo,
+        name: name || cleanRepo,
+        packageName: pkg,
+        summary,
+        description: desc,
+        icon,
+        category,
         paymentType,
         price,
         paymentUrl,
@@ -1706,20 +1734,57 @@ function setupEventListeners() {
       localStorage.setItem('lauju_my_published_apps', JSON.stringify(myApps));
       renderPublisherSavedList();
 
+      // Auch direkt im lokalen App-Katalog bereitstellen, damit der Nutzer seine App sofort im Store sieht!
+      const catIdx = state.apps.findIndex(a => a.packageName === pkg || a.id === cleanRepo);
+      const storeItem = {
+        id: pkg,
+        packageName: pkg,
+        name: name,
+        summary: summary,
+        description: desc || summary,
+        versionName: '1.0.0',
+        versionCode: 1,
+        size: 'GitHub Source',
+        author: cleanRepo.split('/')[0] || 'Lauju Entwickler',
+        category: category,
+        icon: icon || '📦',
+        license: 'MIT / Open Source',
+        repoId: 'lauju',
+        paymentType: paymentType,
+        price: price,
+        paymentUrl: paymentUrl,
+        isBeta: isBeta,
+        apkUrl: `https://github.com/${cleanRepo}/releases/latest/download/app-release-unsigned.apk`,
+        sourceUrl: `https://github.com/${cleanRepo}`,
+        changelog: 'Neu über den In-App Publisher Hub eingereicht.'
+      };
+
+      if (catIdx >= 0) {
+        state.apps[catIdx] = storeItem;
+      } else {
+        state.apps.push(storeItem);
+      }
+      localStorage.setItem('lauju_store_catalog', JSON.stringify(state.apps));
+      renderExploreList();
+
       // GitHub Issue-Link öffnen für offizielle Freischaltung
-      const title = `[App Einreichung / Update] ${cleanRepo}`;
+      const title = `[App Einreichung / Update] ${name} (${cleanRepo})`;
       const body = `### App Einreichung aus Lauju Store\\n\\n` +
                    `- **Repo:** https://github.com/${cleanRepo}\\n` +
+                   `- **Name:** ${name}\\n` +
+                   `- **Paket-ID:** ${pkg}\\n` +
+                   `- **Kategorie:** ${category}\\n` +
+                   `- **Kurzbeschreibung:** ${summary}\\n` +
                    `- **Modell:** ${paymentType}\\n` +
                    `- **Preis:** ${price || 'Kostenlos'}\\n` +
                    `- **Zahlungslink:** ${paymentUrl || 'Keiner'}\\n` +
                    `- **Beta:** ${isBeta ? 'Ja' : 'Nein'}\\n\\n` +
-                   `*Eingereicht direkt über die Lauju Store Android App.*`;
+                   `*Eingereicht und lokal gespeichert über die Lauju Store Android App.*`;
 
       const issueUrl = `https://github.com/Lauju1909/fdroid-repo/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
       window.open(issueUrl, '_blank');
-      announceSR('Einreichung gespeichert und Freigabe-Antrag auf GitHub geöffnet.');
-      alert('Deine Einreichung wurde lokal gespeichert und das GitHub-Fenster zur Freischaltung geöffnet!');
+      announceSR(`${name} lokal gespeichert und GitHub-Antrag geöffnet.`);
+      alert(`App "${name}" wurde erfolgreich lokal gespeichert und im Store-Katalog hinterlegt!\nDas GitHub-Fenster zur offiziellen Freischaltung wurde geöffnet.`);
     });
   }
 }
@@ -1755,10 +1820,16 @@ function renderPublisherSavedList() {
       const v = item.paymentType;
       document.getElementById('pub-row-price').style.display = (v === 'paid') ? 'block' : 'none';
       document.getElementById('pub-row-payment-url').style.display = (v === 'paid' || v === 'donation') ? 'block' : 'none';
+      document.getElementById('pub-name').value = item.name || '';
+      document.getElementById('pub-package').value = item.packageName || '';
+      document.getElementById('pub-summary').value = item.summary || '';
+      document.getElementById('pub-desc').value = item.description || '';
+      document.getElementById('pub-icon').value = item.icon || '';
+      if (item.category) document.getElementById('pub-category').value = item.category;
       document.getElementById('pub-preview-name').textContent = item.name;
       document.getElementById('pub-preview-ver').textContent = 'Lokal gespeichert';
       document.getElementById('pub-preview-box').style.display = 'block';
-      announceSR(`Daten für ${item.name} in das Formular geladen.`);
+      announceSR(`Alle Daten für ${item.name} in das Formular geladen.`);
     });
 
     container.appendChild(el);
