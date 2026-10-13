@@ -1,7 +1,7 @@
 // Lauju Store – Barrierefreier App Store (F-Droid & Neo Store Client)
 // Entwickelt von Laurin Schneider für 100% TalkBack- und Tastatur-Zugänglichkeit
 
-const APP_VERSION = 'v1.0.5';
+const APP_VERSION = 'v1.0.6';
 const STORE_PACKAGE = 'de.lauri.appstore';
 
 // 1. Vorkonfigurierte Standard-Paketquellen
