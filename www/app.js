@@ -896,7 +896,18 @@ async function openAppDetails(app) {
 
   document.getElementById('modal-app-icon').innerHTML = renderAppIconHtml(app.icon);
   document.getElementById('modal-app-title').textContent = app.name;
-  document.getElementById('modal-app-author').textContent = `Von: ${app.author || 'Open Source Entwickler'}`;
+
+  const authorEl = document.getElementById('modal-app-author');
+  const isPaid = (app.paymentType === 'paid');
+  const shouldHideAuthor = !!app.hideAuthor && !isPaid;
+
+  if (shouldHideAuthor) {
+    authorEl.style.display = 'none';
+  } else {
+    authorEl.style.display = 'block';
+    authorEl.textContent = `Von: ${app.author || 'Open Source Entwickler'}`;
+  }
+
   document.getElementById('modal-app-version').textContent = `v${app.versionName}`;
   document.getElementById('modal-app-size').textContent = app.size || '3.5 MB';
   document.getElementById('modal-app-repo').textContent = getRepoBadge(app.repoId);
@@ -1658,10 +1669,25 @@ function setupEventListeners() {
       pubModal.style.display = 'none';
     });
 
+    function validatePubHideAuthor() {
+      const v = pubPaymentSelect.value;
+      const chk = document.getElementById('pub-hide-author');
+      const hint = document.getElementById('pub-hide-author-hint');
+      if (v === 'paid') {
+        chk.checked = false;
+        chk.disabled = true;
+        if (hint) hint.style.display = 'block';
+      } else {
+        chk.disabled = false;
+        if (hint) hint.style.display = 'none';
+      }
+    }
+
     pubPaymentSelect.addEventListener('change', () => {
       const v = pubPaymentSelect.value;
       document.getElementById('pub-row-price').style.display = (v === 'paid') ? 'block' : 'none';
       document.getElementById('pub-row-payment-url').style.display = (v === 'paid' || v === 'donation') ? 'block' : 'none';
+      validatePubHideAuthor();
     });
 
     document.getElementById('btn-pub-check').addEventListener('click', async () => {
@@ -1707,6 +1733,7 @@ function setupEventListeners() {
       const price = document.getElementById('pub-price').value.trim();
       const paymentUrl = document.getElementById('pub-payment-url').value.trim();
       const isBeta = document.getElementById('pub-is-beta').checked;
+      const hideAuthor = (paymentType === 'paid') ? false : document.getElementById('pub-hide-author').checked;
 
       // Lokal in der Store-App merken
       const myApps = JSON.parse(localStorage.getItem('lauju_my_published_apps') || '[]');
@@ -1722,6 +1749,7 @@ function setupEventListeners() {
         price,
         paymentUrl,
         isBeta,
+        hideAuthor,
         submittedAt: Date.now()
       };
       
@@ -1754,6 +1782,7 @@ function setupEventListeners() {
         price: price,
         paymentUrl: paymentUrl,
         isBeta: isBeta,
+        hideAuthor: hideAuthor,
         apkUrl: `https://github.com/${cleanRepo}/releases/latest/download/app-release-unsigned.apk`,
         sourceUrl: `https://github.com/${cleanRepo}`,
         changelog: 'Neu über den In-App Publisher Hub eingereicht.'
@@ -1769,16 +1798,17 @@ function setupEventListeners() {
 
       // GitHub Issue-Link öffnen für offizielle Freischaltung
       const title = `[App Einreichung / Update] ${name} (${cleanRepo})`;
-      const body = `### App Einreichung aus Lauju Store\\n\\n` +
-                   `- **Repo:** https://github.com/${cleanRepo}\\n` +
-                   `- **Name:** ${name}\\n` +
-                   `- **Paket-ID:** ${pkg}\\n` +
-                   `- **Kategorie:** ${category}\\n` +
-                   `- **Kurzbeschreibung:** ${summary}\\n` +
-                   `- **Modell:** ${paymentType}\\n` +
-                   `- **Preis:** ${price || 'Kostenlos'}\\n` +
-                   `- **Zahlungslink:** ${paymentUrl || 'Keiner'}\\n` +
-                   `- **Beta:** ${isBeta ? 'Ja' : 'Nein'}\\n\\n` +
+      const body = `### App Einreichung aus Lauju Store\n\n` +
+                   `- **Repo:** https://github.com/${cleanRepo}\n` +
+                   `- **Name:** ${name}\n` +
+                   `- **Paket-ID:** ${pkg}\n` +
+                   `- **Kategorie:** ${category}\n` +
+                   `- **Kurzbeschreibung:** ${summary}\n` +
+                   `- **Modell:** ${paymentType}\n` +
+                   `- **Preis:** ${price || 'Kostenlos'}\n` +
+                   `- **Zahlungslink:** ${paymentUrl || 'Keiner'}\n` +
+                   `- **Beta:** ${isBeta ? 'Ja' : 'Nein'}\n` +
+                   `- **Autor verbergen:** ${hideAuthor ? 'Ja (Nur für Gratis-/Spenden-Apps)' : 'Nein (Autor wird angezeigt)'}\n\n` +
                    `*Eingereicht und lokal gespeichert über die Lauju Store Android App.*`;
 
       const issueUrl = `https://github.com/Lauju1909/fdroid-repo/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
@@ -1806,7 +1836,7 @@ function renderPublisherSavedList() {
     el.innerHTML = `
       <div>
         <strong style="font-size: 14px;">${item.name}</strong>
-        <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant);">${item.repo} • ${item.paymentType} ${item.price ? '(' + item.price + ')' : ''} ${item.isBeta ? '• 🧪 Beta' : ''}</div>
+        <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant);">${item.repo} • ${item.paymentType} ${item.price ? '(' + item.price + ')' : ''} ${item.isBeta ? '• 🧪 Beta' : ''} ${item.hideAuthor ? '• 🙈 Autor verborgen' : ''}</div>
       </div>
       <button class="btn outline" style="font-size: 12px; padding: 4px 8px;">✏️ Laden</button>
     `;
@@ -1817,9 +1847,20 @@ function renderPublisherSavedList() {
       document.getElementById('pub-price').value = item.price || '';
       document.getElementById('pub-payment-url').value = item.paymentUrl || '';
       document.getElementById('pub-is-beta').checked = !!item.isBeta;
+      document.getElementById('pub-hide-author').checked = !!item.hideAuthor;
       const v = item.paymentType;
       document.getElementById('pub-row-price').style.display = (v === 'paid') ? 'block' : 'none';
       document.getElementById('pub-row-payment-url').style.display = (v === 'paid' || v === 'donation') ? 'block' : 'none';
+      const chk = document.getElementById('pub-hide-author');
+      const hint = document.getElementById('pub-hide-author-hint');
+      if (v === 'paid') {
+        chk.checked = false;
+        chk.disabled = true;
+        if (hint) hint.style.display = 'block';
+      } else {
+        chk.disabled = false;
+        if (hint) hint.style.display = 'none';
+      }
       document.getElementById('pub-name').value = item.name || '';
       document.getElementById('pub-package').value = item.packageName || '';
       document.getElementById('pub-summary').value = item.summary || '';
