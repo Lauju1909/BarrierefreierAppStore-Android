@@ -33,8 +33,9 @@ Dieses Dokument definiert die **verbindlichen Regeln, Pflichten und Verbote** f�
      - `feat: Neue F-Droid Paketquelle hinzugefügt` (für neue Funktionen)
      - `fix: Fehler bei TalkBack-Ansage behoben` (für Fehlerbehebungen)
      - `perf: Katalog-Synchronisation beschleunigt` (für Optimierungen)
-2. ♿ **100% Barrierefreiheit (WCAG 2.2 AAA & Screenreader-Fokus):**
-   - Zielgruppe: Blinde und sehbehinderte Menschen mit Google TalkBack und Tastatursteuerung.
+2. ♿ **100% Barrierefreiheit (WCAG 2.2 AAA & TalkBack-Fokus auf Android):**
+   - **Plattform-Regel:** Jede Android-Version MUSS immer zwingend für TalkBack optimiert sein! Optimierungen für TalkBack dürfen NIEMALS in Desktop-Anwendungen übernommen werden.
+   - Zielgruppe auf Android: Blinde und sehbehinderte Menschen mit Google TalkBack und Tastatursteuerung.
    - Jedes UI-Element muss vollständig ohne Maus per Tastatur (`Tab`, `Enter`, `Leertaste`, Pfeiltasten) erreichbar und bedienbar sein.
    - Alle Statusänderungen, Dialoge, Ladevorgänge und Fehler MÜSSEN über `aria-live="polite"` oder `aria-live="assertive"` an den Screenreader gemeldet werden.
 3. 🚀 **Sauberer Git-Workflow:**
