@@ -47,61 +47,78 @@ public class UpdateCheckWorker extends Worker {
                 installedCodes.put(pi.packageName, code);
             }
 
-            // F-Droid Repositories prüfen (aus SharedPreferences oder Standard)
-            String repoUrl = "https://lauju1909.github.io/fdroid-repo/fdroid/repo/index-v1.json";
-            URL url = new URL(repoUrl);
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestProperty("User-Agent", "LaujuStore/1.0");
-            conn.setConnectTimeout(10000);
-            conn.setReadTimeout(15000);
-            conn.connect();
+            // Repositories prüfen (Lauju Repo + Offizielles F-Droid Repo)
+            String[] repoUrls = new String[] {
+                    "https://lauju1909.github.io/fdroid-repo/fdroid/repo/index-v1.json",
+                    "https://f-droid.org/repo/index-v1.json"
+            };
 
-            if (conn.getResponseCode() == 200) {
-                BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-                StringBuilder sb = new StringBuilder();
-                String line;
-                while ((line = br.readLine()) != null) {
-                    sb.append(line);
-                }
-                br.close();
+            java.util.Set<String> updatedPackages = new java.util.HashSet<>();
+            String firstAppName = "";
 
-                JSONObject root = new JSONObject(sb.toString());
-                JSONObject packages = root.optJSONObject("packages");
-                JSONArray apps = root.optJSONArray("apps");
+            for (String repoUrl : repoUrls) {
+                HttpURLConnection conn = null;
+                try {
+                    URL url = new URL(repoUrl);
+                    conn = (HttpURLConnection) url.openConnection();
+                    conn.setRequestProperty("User-Agent", "LaujuStore/1.0");
+                    conn.setConnectTimeout(15000);
+                    conn.setReadTimeout(30000);
+                    conn.connect();
 
-                int updateCount = 0;
-                String firstAppName = "";
+                    if (conn.getResponseCode() == 200) {
+                        BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                        StringBuilder sb = new StringBuilder();
+                        String line;
+                        while ((line = br.readLine()) != null) {
+                            sb.append(line);
+                        }
+                        br.close();
 
-                if (packages != null && apps != null) {
-                    for (int i = 0; i < apps.length(); i++) {
-                        JSONObject appObj = apps.getJSONObject(i);
-                        String pkgName = appObj.optString("packageName");
-                        String appName = appObj.optString("name", pkgName);
+                        JSONObject root = new JSONObject(sb.toString());
+                        JSONObject packages = root.optJSONObject("packages");
+                        JSONArray apps = root.optJSONArray("apps");
 
-                        if (installedCodes.containsKey(pkgName)) {
-                            long installedCode = installedCodes.get(pkgName);
-                            JSONArray versions = packages.optJSONArray(pkgName);
-                            if (versions != null && versions.length() > 0) {
-                                long maxCode = 0;
-                                for (int j = 0; j < versions.length(); j++) {
-                                    JSONObject verObj = versions.getJSONObject(j);
-                                    long vCode = verObj.optLong("versionCode", 0);
-                                    if (vCode > maxCode) maxCode = vCode;
-                                }
-                                if (maxCode > installedCode) {
-                                    updateCount++;
-                                    if (firstAppName.isEmpty()) firstAppName = appName;
+                        if (packages != null && apps != null) {
+                            for (int i = 0; i < apps.length(); i++) {
+                                JSONObject appObj = apps.getJSONObject(i);
+                                String pkgName = appObj.optString("packageName");
+                                String appName = appObj.optString("name", pkgName);
+
+                                if (installedCodes.containsKey(pkgName) && !updatedPackages.contains(pkgName)) {
+                                    long installedCode = installedCodes.get(pkgName);
+                                    JSONArray versions = packages.optJSONArray(pkgName);
+                                    if (versions != null && versions.length() > 0) {
+                                        long maxCode = 0;
+                                        for (int j = 0; j < versions.length(); j++) {
+                                            JSONObject verObj = versions.getJSONObject(j);
+                                            long vCode = verObj.optLong("versionCode", 0);
+                                            if (vCode > maxCode) maxCode = vCode;
+                                        }
+                                        if (maxCode > installedCode) {
+                                            updatedPackages.add(pkgName);
+                                            if (firstAppName.isEmpty()) {
+                                                firstAppName = appName;
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
-                }
-
-                if (updateCount > 0) {
-                    sendNotification(context, updateCount, firstAppName);
+                } catch (Exception repoEx) {
+                    // Falls ein Repo temporär nicht erreichbar ist, anderes trotzdem prüfen
+                } finally {
+                    if (conn != null) {
+                        conn.disconnect();
+                    }
                 }
             }
-            conn.disconnect();
+
+            int updateCount = updatedPackages.size();
+            if (updateCount > 0) {
+                sendNotification(context, updateCount, firstAppName);
+            }
             return Result.success();
         } catch (Exception e) {
             return Result.retry();

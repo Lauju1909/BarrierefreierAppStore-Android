@@ -596,7 +596,10 @@ function renderExploreList() {
     return;
   }
 
-  filtered.forEach(app => {
+  const maxInitial = 40;
+  const itemsToRender = filtered.slice(0, maxInitial);
+
+  itemsToRender.forEach(app => {
     const isInstalled = !!state.installedApps[app.packageName];
     const card = document.createElement('article');
     card.className = 'app-card';
@@ -646,6 +649,60 @@ function renderExploreList() {
 
     container.appendChild(card);
   });
+
+  if (filtered.length > maxInitial) {
+    const loadMoreRow = document.createElement('div');
+    loadMoreRow.style.cssText = 'grid-column: 1/-1; text-align: center; padding: 18px 0;';
+    const remaining = filtered.length - maxInitial;
+    loadMoreRow.innerHTML = `
+      <button class="btn primary btn-large" style="min-width: 260px;" aria-label="${remaining} weitere Apps im Katalog anzeigen">
+        ➕ Weitere Apps laden (+${remaining > 40 ? 40 : remaining} von ${remaining})
+      </button>
+    `;
+    loadMoreRow.querySelector('button').addEventListener('click', () => {
+      loadMoreRow.remove();
+      const nextBatch = filtered.slice(maxInitial, maxInitial + 40);
+      nextBatch.forEach(app => {
+        const isInstalled = !!state.installedApps[app.packageName];
+        const card = document.createElement('article');
+        card.className = 'app-card';
+        card.tabIndex = 0;
+        card.setAttribute('role', 'article');
+        card.setAttribute('aria-label', `${app.name}, Version ${app.versionName}. ${isInstalled ? 'Bereits installiert.' : 'Nicht installiert.'}`);
+        card.innerHTML = `
+          <div class="app-card-icon" aria-hidden="true">${renderAppIconHtml(app.icon)}</div>
+          <div class="app-card-info">
+            <h3 class="app-card-title">${app.name}</h3>
+            <p class="app-card-desc">${app.summary}</p>
+            <div class="app-card-meta">
+              <span class="app-card-version">v${app.versionName}</span>
+              <span>•</span>
+              <span>${app.size}</span>
+              <span>•</span>
+              <span>${getRepoBadge(app.repoId)}</span>
+              ${app.paymentType === 'paid' ? `<span>•</span><span style="color: #f0883e; font-weight: bold;">💰 ${app.price || 'Kauf'}</span>` : ''}
+              ${app.paymentType === 'donation' ? `<span>•</span><span style="color: #d29922; font-weight: bold;">☕ Spende</span>` : ''}
+              ${app.isBeta ? `<span>•</span><span style="color: #8957e5; font-weight: bold;">🧪 Beta</span>` : ''}
+            </div>
+          </div>
+          <div class="app-card-action">
+            <button class="btn ${isInstalled ? 'outline' : 'primary'}" aria-label="${isInstalled ? app.name + ' öffnen' : app.name + ' installieren'}">
+              ${isInstalled ? 'Öffnen' : 'Laden'}
+            </button>
+          </div>
+        `;
+        card.querySelector('button').addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (isInstalled) openAppByPackage(app.packageName, app.name);
+          else openAppDetails(app);
+        });
+        card.addEventListener('click', () => openAppDetails(app));
+        container.appendChild(card);
+      });
+      announceSR(`${nextBatch.length} weitere Apps geladen.`);
+    });
+    container.appendChild(loadMoreRow);
+  }
 }
 
 function renderAppIconHtml(icon) {
@@ -1312,6 +1369,16 @@ function renderRepositoriesList() {
   });
 }
 
+function normalizeAppCategory(categories, defaultCat = 'tools') {
+  if (!categories || categories.length === 0) return defaultCat;
+  const raw = Array.isArray(categories) ? categories.join(' ').toLowerCase() : String(categories).toLowerCase();
+  if (raw.includes('accessib') || raw.includes('screen') || raw.includes('blind') || raw.includes('speech')) return 'accessibility';
+  if (raw.includes('financ') || raw.includes('productiv') || raw.includes('money') || raw.includes('wallet') || raw.includes('time') || raw.includes('shop')) return 'productivity';
+  if (raw.includes('educat') || raw.includes('learn') || raw.includes('read') || raw.includes('book') || raw.includes('dict') || raw.includes('translat')) return 'education';
+  if (raw.includes('game') || raw.includes('play') || raw.includes('puzzle') || raw.includes('casual')) return 'games';
+  return 'tools';
+}
+
 async function syncAllRepositories(silent = false) {
   if (!silent) announceSR('Synchronisiere alle aktiven Paketquellen...');
   const syncBtn = document.getElementById('btn-sync-all');
@@ -1325,20 +1392,40 @@ async function syncAllRepositories(silent = false) {
       if (!res.ok) continue;
       const data = await res.json();
       const pkgs = data.packages || {};
+      const allApps = data.apps || [];
 
-      (data.apps || []).forEach(meta => {
+      // Sortieren: Kürzlich aktualisierte Apps nach oben
+      if (repo.id === 'fdroid') {
+        allApps.sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0));
+      }
+
+      let importedCount = 0;
+      const installedPkgSet = new Set(Object.keys(state.installedApps || {}));
+      if (state.allDeviceApps) {
+        state.allDeviceApps.forEach(d => installedPkgSet.add(d.packageName));
+      }
+
+      for (let i = 0; i < allApps.length; i++) {
+        const meta = allApps[i];
         const versions = pkgs[meta.packageName];
-        if (!versions || versions.length === 0) return;
-        const latest = versions.reduce((a, b) => (b.versionCode > a.versionCode ? b : a));
+        if (!versions || versions.length === 0) continue;
+        const latest = versions.reduce((a, b) => (b.versionCode > a.versionCode ? b : a), versions[0]);
         const apkUrl = `${base}/${latest.apkName}`;
         const sizeMb = latest.size ? `${(latest.size / 1048576).toFixed(1)} MB` : '';
         const sha256 = latest.hash || latest.sha256 || '';
 
-        // Icon auflösen (URL oder Fallback)
-        let iconUrl = meta.icon ? `${base}/icons/${meta.icon}` : '';
-        if (!iconUrl && meta.iconName) iconUrl = `${base}/icons/${meta.iconName}`;
+        // Deutsche oder beste verfügbare Lokalisierung auswählen
+        const loc = meta.localized ? (meta.localized['de-DE'] || meta.localized['de'] || meta.localized['en-US'] || meta.localized['en']) : null;
+        const resolvedName = (loc && loc.name) || meta.name || meta.packageName;
+        const resolvedSummary = (loc && loc.summary) || meta.summary || '';
+        const resolvedDesc = (loc && loc.description) || meta.description || resolvedSummary;
+        const changelogText = (loc && loc.whatsNew) || meta.changelog || `v${latest.versionName}`;
 
-        const category = (meta.categories && meta.categories.length > 0) ? meta.categories[0].toLowerCase() : (meta.category || 'tools');
+        // Icon auflösen (URL oder Fallback)
+        let iconFile = (loc && loc.icon) || meta.icon || meta.iconName || '';
+        let iconUrl = iconFile ? `${base}/icons/${iconFile}` : '';
+
+        const category = normalizeAppCategory(meta.categories, meta.category || 'tools');
 
         const existing = state.apps.find(a => a.packageName === meta.packageName);
         if (existing) {
@@ -1351,40 +1438,51 @@ async function syncAllRepositories(silent = false) {
             existing.repoId = repo.id;
             if (sha256) existing.sha256 = sha256;
             if (iconUrl && !existing.icon?.startsWith('data:image')) existing.icon = iconUrl;
+            if (resolvedName && resolvedName !== existing.packageName) existing.name = resolvedName;
+            if (resolvedSummary) existing.summary = resolvedSummary;
+            if (resolvedDesc) existing.description = resolvedDesc;
             if (category) existing.category = category;
-            if (meta.changelog) existing.changelog = meta.changelog;
+            if (changelogText) existing.changelog = changelogText;
             if (meta.paymentUrl) existing.paymentUrl = meta.paymentUrl;
             if (meta.paymentType) existing.paymentType = meta.paymentType;
             if (meta.price) existing.price = meta.price;
             if (meta.isBeta !== undefined) existing.isBeta = meta.isBeta;
           }
         } else {
-          state.apps.push({
-            id: meta.packageName,
-            packageName: meta.packageName,
-            name: meta.name || meta.packageName,
-            summary: meta.summary || '',
-            description: meta.description || meta.summary || '',
-            versionName: latest.versionName,
-            versionCode: latest.versionCode,
-            size: sizeMb || '? MB',
-            author: meta.authorName || 'Unbekannt',
-            category: category,
-            icon: iconUrl || '📦',
-            license: meta.license || 'Open Source',
-            repoId: repo.id,
-            apkUrl,
-            sha256: sha256,
-            paymentType: meta.paymentType || 'free',
-            price: meta.price || '',
-            paymentUrl: meta.paymentUrl || '',
-            isBeta: !!meta.isBeta || latest.versionName?.toLowerCase().includes('beta'),
-            sourceUrl: meta.sourceCode || '',
-            changelog: meta.changelog || `v${latest.versionName}`
-          });
-          changed = true;
+          // Aufnehmen: Alle Lauju-Apps, alle auf dem Gerät installierten Apps (für Updates!)
+          // sowie die Top-Apps aus F-Droid (bis zu 400 Apps im Hauptkatalog für blitzschnelle Ladezeiten)
+          const isInstalledOnDevice = installedPkgSet.has(meta.packageName);
+          const shouldIncludeInCatalog = (repo.id !== 'fdroid') || isInstalledOnDevice || (importedCount < 400);
+
+          if (shouldIncludeInCatalog) {
+            state.apps.push({
+              id: meta.packageName,
+              packageName: meta.packageName,
+              name: resolvedName,
+              summary: resolvedSummary,
+              description: resolvedDesc,
+              versionName: latest.versionName,
+              versionCode: latest.versionCode,
+              size: sizeMb || '? MB',
+              author: meta.authorName || (repo.id === 'lauju' ? 'Laurin Schneider' : 'F-Droid'),
+              category: category,
+              icon: iconUrl || '📦',
+              license: meta.license || 'Open Source',
+              repoId: repo.id,
+              apkUrl,
+              sha256: sha256,
+              paymentType: meta.paymentType || 'free',
+              price: meta.price || '',
+              paymentUrl: meta.paymentUrl || '',
+              isBeta: !!meta.isBeta || latest.versionName?.toLowerCase().includes('beta'),
+              sourceUrl: meta.sourceCode || '',
+              changelog: changelogText
+            });
+            changed = true;
+            importedCount++;
+          }
         }
-      });
+      }
     } catch (e) {
       console.warn('Sync fehlgeschlagen für', repo.url, e);
     }
@@ -1396,7 +1494,7 @@ async function syncAllRepositories(silent = false) {
   if (syncBtn) syncBtn.classList.remove('pulsing');
   if (!silent) {
     playAudioCue();
-    announceSR('Alle Paketquellen synchronisiert. Katalog ist aktuell.');
+    announceSR(`Alle Paketquellen synchronisiert. ${state.apps.length} Apps im Katalog verfügbar.`);
   }
   updateBadgesAndLists();
   renderExploreList();
