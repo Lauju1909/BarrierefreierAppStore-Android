@@ -32,7 +32,7 @@ const DEFAULT_REPOSITORIES = [
   }
 ];
 
-// 2. Integrierter Offline-Katalog für garantierte Verfügbarkeit
+// 2. Integrierter Offline-Katalog für garantierte Verfügbarkeit (alle mit signierten Repository-APKs)
 const INITIAL_APPS = [
   {
     id: 'finanzapp',
@@ -40,17 +40,20 @@ const INITIAL_APPS = [
     name: 'Haushaltsbuch Barrierefrei',
     summary: 'Barrierefreie Finanzverwaltung, Haushaltsbuch, Verträge, Budgets & Quittungs-Scanner',
     description: 'Das barrierefreie Haushaltsbuch wurde speziell für blinde und sehbehinderte Menschen entwickelt. Es bietet volle TalkBack-Unterstützung, einfache Buchungserfassung, Vertragsverwaltung, sichere Backups und Beleg-Verwaltung ohne Cloud-Zwang.',
-    versionName: '6.9.8',
-    versionCode: 20,
-    size: '3.3 MB',
+    versionName: '6.9.26',
+    versionCode: 38,
+    size: '3.6 MB',
     author: 'Laurin Schneider',
     category: 'productivity',
-    icon: '💰',
+    icon: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/icons/de.lauri.finanzapp.png',
     license: 'MIT',
     repoId: 'lauju',
-    apkUrl: 'https://github.com/Lauju1909/BarrierefreieFinanzApp-Android/releases/latest/download/app-release-unsigned.apk',
+    paymentType: 'free',
+    price: '',
+    paymentUrl: 'https://ko-fi.com/lauju1909',
+    apkUrl: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/de.lauri.finanzapp_6.9.26.apk',
     sourceUrl: 'https://github.com/Lauju1909/BarrierefreieFinanzApp-Android',
-    changelog: 'v6.9.8: Neue Multiplattform-Synchronisation, automatisches Änderungsprotokoll & TalkBack-Verbesserungen.'
+    changelog: 'v6.9.26: Multiplattform-Synchronisation, Offline-Tresor & TalkBack-Verbesserungen.'
   },
   {
     id: 'stundenplan',
@@ -58,53 +61,71 @@ const INITIAL_APPS = [
     name: 'Barrierefreies WebUntis',
     summary: 'Stundenplan & Vertretungsplan für Schüler am LWL-Berufskolleg Soest',
     description: 'Offizieller, 100% barrierefreier Stundenplan für blinde und sehbehinderte Schüler. Zeigt aktuelle Unterrichtsstunden, Raumänderungen, Vertretungen und den Mensa-Speiseplan mit optimierter Tastatur- und Screenreader-Bedienung.',
-    versionName: '1.9.30',
-    versionCode: 31,
-    size: '3.1 MB',
+    versionName: '1.9.35',
+    versionCode: 36,
+    size: '3.2 MB',
     author: 'Laurin Schneider',
     category: 'education',
-    icon: '📅',
+    icon: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/icons/de.lwl.stundenplan.png',
     license: 'MIT',
     repoId: 'lauju',
-    apkUrl: 'https://github.com/Lauju1909/BarrierefreierStundenplanLWL-Android/releases/latest/download/app-release-unsigned.apk',
+    apkUrl: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/de.lwl.stundenplan_1.9.35.apk',
     sourceUrl: 'https://github.com/Lauju1909/BarrierefreierStundenplanLWL-Android',
-    changelog: 'v1.9.30: Schnellauswahl für Tage, verbesserte Barrierefreiheit & automatisches Änderungsprotokoll.'
+    changelog: 'v1.9.35: Aktuelle Speisepläne, dynamische Kalenderwochen & TalkBack-Verbesserungen.'
   },
   {
     id: 'vokabelstar',
     packageName: 'de.lauri.vokabelstar',
-    name: 'VokabelStar Trainer',
-    summary: 'Mobiler barrierefreier Vokabeltrainer mit Word/Excel-Import & Sprachausgabe',
-    description: 'Lerne Fremdsprachen effektiv und barrierefrei auf deinem Smartphone. Unterstützt Word- und Excel-Dateien, Audio-Aussprache und verschiedene barrierefreie Abfragemodi.',
+    name: 'VokabelStar',
+    summary: 'Barrierefreier Vokabeltrainer wie Duolingo – speziell optimiert für TalkBack & Screenreader',
+    description: 'Lerne Fremdsprachen effektiv und barrierefrei auf deinem Smartphone. Unterstützt Word- und Excel-Dateien, Audio-Aussprache und verschiedene barrierefreie Abfragemodi ohne Schreibzwang.',
     versionName: '1.3.2',
     versionCode: 8,
     size: '3.5 MB',
     author: 'Laurin Schneider',
     category: 'education',
-    icon: '⭐',
+    icon: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/icons/de.lauri.vokabelstar.png',
     license: 'MIT',
     repoId: 'lauju',
-    apkUrl: 'https://github.com/Lauju1909/VokabelStar-Android/releases/latest/download/VokabelStar_v1.3.2.apk',
+    apkUrl: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/de.lauri.vokabelstar_1.3.2.apk',
     sourceUrl: 'https://github.com/Lauju1909/VokabelStar-Android',
     changelog: 'v1.3.2: Android 14/15 Unterstützung, optimierte Audio-Engine & Fehlerbehebungen.'
   },
   {
-    id: 'lernplatform',
-    packageName: 'de.lauri.lernplatform',
-    name: 'Lernplattform Android',
-    summary: 'Mobiles barrierefreies Lernen, Wissensquiz & Übungsaufgaben',
-    description: 'Die mobile Lernplattform bietet interaktive Übungen, Lernkarten und Tests in verschiedenen Fächern, optimiert für TalkBack und Großschrift.',
+    id: 'vokabelmeister',
+    packageName: 'de.lauri.vokabelmeister',
+    name: 'VokabelMeister (Lernplattform)',
+    summary: 'Barrierefreier schriftlicher Vokabeltrainer & Lernplattform mit Fehlertoleranz',
+    description: 'Die mobile Lernplattform und schriftliche Vokabel-App bietet interaktive Übungen, Lernkarten, Tippfehlertoleranz und Tests in verschiedenen Fächern, optimiert für TalkBack und Großschrift.',
     versionName: '1.2.5',
     versionCode: 8,
     size: '3.5 MB',
     author: 'Laurin Schneider',
     category: 'education',
-    icon: '🎓',
+    icon: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/icons/de.lauri.lernplatform.png',
     license: 'MIT',
     repoId: 'lauju',
-    apkUrl: 'https://github.com/Lauju1909/Lernplatform-Android/releases/latest/download/app-release-unsigned.apk',
+    apkUrl: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/de.lauri.lernplatform_1.2.5.apk',
     sourceUrl: 'https://github.com/Lauju1909/Lernplatform-Android',
     changelog: 'v1.2.5: Neue Quiz-Module, schnellere Ladezeiten & Fehlerbehebungen.'
+  },
+  {
+    id: 'bfwenglisch',
+    packageName: 'de.lauri.bfwenglisch',
+    name: 'BFW Vokabel-Verwaltung',
+    summary: 'Vokabel-Hub für Wirtschaftsenglisch BFW 1 & BFW 2 (VokabelStar & VokabelMeister)',
+    description: 'Zentrale barrierefreie Vokabel-Management-App für die Berufsfachschule Wirtschaft mit allen offiziellen Themen aus BFW 1 & BFW 2, Universal-Import und englischer Sprachausgabe.',
+    versionName: '1.2.1',
+    versionCode: 4,
+    size: '3.4 MB',
+    author: 'Laurin Schneider',
+    category: 'education',
+    icon: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/icons/de.lauri.bfwenglisch.png',
+    license: 'MIT',
+    repoId: 'lauju',
+    apkUrl: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/de.lauri.bfwenglisch_1.2.1.apk',
+    sourceUrl: 'https://github.com/Lauju1909/BFW-Wirtschaftsenglisch-Android',
+    changelog: 'v1.2.1: Direkt-Export für VokabelStar und VokabelMeister & TalkBack-Optimierung.'
   },
   {
     id: 'audiostudio',
@@ -112,17 +133,17 @@ const INITIAL_APPS = [
     name: 'Audio Studio Tycoon',
     summary: 'Barrierefreie Spieleentwickler-Simulation komplett nach Gehör spielbar',
     description: 'Baue dein eigenes Gaming-Studio auf! Mit vollständiger Sprachausgabe, haptischem Feedback und spannenden Soundeffekten.',
-    versionName: '1.1.0',
-    versionCode: 4,
-    size: '8.4 MB',
+    versionName: '1.0',
+    versionCode: 1,
+    size: '3.4 MB',
     author: 'Laurin Schneider',
     category: 'games',
-    icon: '🎧',
+    icon: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/icons/de.lauri.audiostudiotycoon.png',
     license: 'MIT',
     repoId: 'lauju',
-    apkUrl: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/AudioStudioTycoon.apk',
-    sourceUrl: 'https://github.com/Lauju1909/fdroid-repo',
-    changelog: 'v1.1.0: Neue Spiele-Genres, verbesserte Sound-Synthese.'
+    apkUrl: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/de.lauri.audiostudiotycoon_1.0.0.apk',
+    sourceUrl: 'https://github.com/Lauju1909/Audio-Studio-Tycoon-Android',
+    changelog: 'v1.0: Vollständig mit TalkBack spielbare Entwickler-Simulation.'
   },
   {
     id: 'minigames',
@@ -130,17 +151,17 @@ const INITIAL_APPS = [
     name: 'Audio Mini Games',
     summary: 'Über 60 barrierefreie Minispiele spielbar nach Gehör und Haptik',
     description: 'Eine bunte Sammlung barrierefreier Reaktions-, Denk- und Rhythmusspiele ohne visuelle Barrieren.',
-    versionName: '2.0.1',
-    versionCode: 12,
-    size: '14.2 MB',
+    versionName: '1.0',
+    versionCode: 1,
+    size: '3.5 MB',
     author: 'Laurin Schneider',
     category: 'games',
-    icon: '🕹️',
+    icon: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/icons/de.lauri.minigames.png',
     license: 'MIT',
     repoId: 'lauju',
-    apkUrl: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/MiniGameSammlung.apk',
-    sourceUrl: 'https://github.com/Lauju1909/fdroid-repo',
-    changelog: 'v2.0.1: Neue Minispiele hinzugefügt, Highscore-System erweitert.'
+    apkUrl: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/de.lauri.minigames_1.0.0.apk',
+    sourceUrl: 'https://github.com/Lauju1909/Mini_Game_Sammlung_Android',
+    changelog: 'v1.0: Über 60 barrierefreie Audio-Minispiele für Android.'
   },
   {
     id: 'translator',
@@ -148,17 +169,20 @@ const INITIAL_APPS = [
     name: 'TalkBack Deutsch-Übersetzer',
     summary: 'Liest fremdsprachige Android-Apps live auf Deutsch für Screenreader vor',
     description: 'Ein mächtiges Barrierefreiheits-Tool: Übersetzt englische Bildschirminhalte live und gibt sie über die TalkBack-Sprachausgabe wieder.',
-    versionName: '1.0.4',
-    versionCode: 5,
+    versionName: '1.3.2',
+    versionCode: 9,
     size: '5.1 MB',
     author: 'Laurin Schneider',
     category: 'accessibility',
-    icon: '🗣️',
-    license: 'GPL-3.0',
+    icon: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/icons/com.talkback.translator.png',
+    license: 'MIT',
     repoId: 'lauju',
-    apkUrl: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/TalkBackTranslator.apk',
-    sourceUrl: 'https://github.com/Lauju1909/fdroid-repo',
-    changelog: 'v1.0.4: Schnelleres OCR, flüssigere Sprachausgabe.'
+    isBeta: true,
+    paymentType: 'free',
+    paymentUrl: 'https://ko-fi.com/lauju1909',
+    apkUrl: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/com.talkback.translator_1.3.2.apk',
+    sourceUrl: 'https://github.com/Lauju1909/TalkBack-Deutsch-Uebersetzer-Android',
+    changelog: 'v1.3.2: Schnelleres Live-Übersetzen und verbesserte Sprachausgabe.'
   },
   {
     id: 'appstore',
@@ -166,20 +190,20 @@ const INITIAL_APPS = [
     name: 'Lauju Store',
     summary: 'Dieser barrierefreie Open-Source App Store (F-Droid & Neo Store Client)',
     description: 'Der moderne, barrierefreie Store für alle deine Android-Anwendungen. Unterstützt F-Droid Repositories, automatische Update-Prüfung, TalkBack-Optimierung und Google Play Protect Konformität.',
-    versionName: '1.0.5',
-    versionCode: 6,
+    versionName: '1.0.9',
+    versionCode: 10,
     size: '3.8 MB',
     author: 'Laurin Schneider',
     category: 'tools',
-    icon: '🏪',
+    icon: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/icons/de.lauri.appstore.png',
     license: 'MIT',
     repoId: 'lauju',
-    paymentType: 'donation',
+    paymentType: 'free',
     price: '',
     paymentUrl: 'https://ko-fi.com/lauju1909',
-    apkUrl: 'https://github.com/Lauju1909/BarrierefreierAppStore-Android/releases/latest/download/app-release-unsigned.apk',
+    apkUrl: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/de.lauri.appstore_1.0.9.apk',
     sourceUrl: 'https://github.com/Lauju1909/BarrierefreierAppStore-Android',
-    changelog: 'v1.0.5: Paketquellen-Suche, App-Deinstallation, automatische Übersetzungen & Zahlungsunterstützung.'
+    changelog: 'v1.0.9: Offizielle F-Droid Katalog- und Update-Integration, TalkBack-Verbesserungen.'
   },
   {
     id: 'dokumentenbetrachter',
@@ -187,20 +211,20 @@ const INITIAL_APPS = [
     name: 'Dokumenten-Betrachter Barrierefrei',
     summary: 'Barrierefreier Office-Viewer für LibreOffice (ODT, ODS), Word (DOCX), PDF und Text',
     description: 'Speziell für Menschen mit Blindheit und Sehbehinderung entwickelt: Wandelt Office-Dokumente und Tabellen in semantische Textstrukturen mit TalkBack-Navigation und Sprachausgabe um.',
-    versionName: '1.0.0',
-    versionCode: 1,
+    versionName: '1.0.2',
+    versionCode: 3,
     size: '3.5 MB',
     author: 'Laurin Schneider',
     category: 'tools',
-    icon: '📄',
+    icon: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/icons/de.lauri.dokumentenbetrachter.png',
     license: 'MIT',
     repoId: 'lauju',
-    paymentType: 'donation',
+    paymentType: 'free',
     price: '',
-    paymentUrl: 'https://ko-fi.com/lauju1909',
-    apkUrl: 'https://github.com/Lauju1909/BarrierefreierDokumentenBetrachter-Android/releases/latest/download/app-release-unsigned.apk',
+    paymentUrl: '',
+    apkUrl: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/de.lauri.dokumentenbetrachter_1.0.2.apk',
     sourceUrl: 'https://github.com/Lauju1909/BarrierefreierDokumentenBetrachter-Android',
-    changelog: 'v1.0.0: Erste Veröffentlichung für barrierefreie Office- und PDF-Dokumente.'
+    changelog: 'v1.0.2: Verbesserte PDF- und Office-Tabellen-Extraktion für TalkBack.'
   },
   {
     id: 'newpipe',
@@ -211,7 +235,7 @@ const INITIAL_APPS = [
     versionName: '0.27.2',
     versionCode: 994,
     size: '11.5 MB',
-    author: 'NewPipe Team',
+    author: 'TeamNewPipe',
     category: 'tools',
     icon: '📺',
     license: 'GPL-3.0',
@@ -226,15 +250,15 @@ const INITIAL_APPS = [
     name: 'VLC for Android',
     summary: 'Der bekannte, universelle Audio- und Video-Player',
     description: 'Spielt alle Video- und Audioformate, Netzwerk-Streams und Medien ab. Hohe Zugänglichkeit und umfassende Equalizer-Optionen.',
-    versionName: '3.5.4',
-    versionCode: 3050407,
+    versionName: '3.7.1',
+    versionCode: 13070108,
     size: '34.8 MB',
     author: 'VideoLAN',
     category: 'tools',
     icon: '🎬',
     license: 'GPL-2.0',
     repoId: 'fdroid',
-    apkUrl: 'https://f-droid.org/repo/org.videolan.vlc_3050407.apk',
+    apkUrl: 'https://f-droid.org/repo/org.videolan.vlc_13070108.apk',
     sourceUrl: 'https://code.videolan.org/videolan/vlc-android',
     changelog: 'Verbesserte Audio-Decodierung und Untertitel-Support.'
   }
@@ -247,6 +271,7 @@ let state = {
   currentCategory: 'all',
   currentSort: 'featured',
   installedFilter: 'store_only',
+  exploreVisibleCount: 40,
   repositories: [],
   apps: [],
   onlineSearchResults: [], // Dynamisch geladene F-Droid / Izzy Online-Ergebnisse
@@ -407,23 +432,39 @@ function playAudioCue() {
 
 // 6. Initialisierung & Speicher laden
 function loadSettingsAndState() {
-  // Repositories laden
+  // Repositories laden & F-Droid standardmäßig aktivieren
   const savedRepos = localStorage.getItem('lauju_store_repos');
   if (savedRepos) {
-    try { state.repositories = JSON.parse(savedRepos); } catch(e) { state.repositories = DEFAULT_REPOSITORIES; }
+    try {
+      state.repositories = JSON.parse(savedRepos);
+      let fdroidRepo = state.repositories.find(r => r.id === 'fdroid');
+      if (!fdroidRepo) {
+        state.repositories.push({
+          id: 'fdroid',
+          name: '📦 F-Droid Official Repository',
+          url: 'https://f-droid.org/repo',
+          fingerprint: '',
+          enabled: true,
+          official: true
+        });
+      } else {
+        fdroidRepo.enabled = true;
+      }
+    } catch(e) {
+      state.repositories = DEFAULT_REPOSITORIES;
+    }
   } else {
     state.repositories = DEFAULT_REPOSITORIES;
     localStorage.setItem('lauju_store_repos', JSON.stringify(DEFAULT_REPOSITORIES));
   }
 
-  // Installierte Apps laden
+  // Installierte Apps laden (ohne speicherintensive Icons)
   const savedInstalled = localStorage.getItem('lauju_store_installed');
   if (savedInstalled) {
     try { state.installedApps = JSON.parse(savedInstalled); } catch(e) { state.installedApps = {}; }
   } else {
-    // Standardmäßig Store selbst als installiert markieren
     state.installedApps = {
-      [STORE_PACKAGE]: { versionName: APP_VERSION.replace('v', ''), versionCode: 1, installedAt: Date.now() }
+      [STORE_PACKAGE]: { versionName: APP_VERSION.replace('v', ''), versionCode: 10, installedAt: Date.now() }
     };
     saveInstalledApps();
   }
@@ -436,6 +477,24 @@ function loadSettingsAndState() {
     state.apps = INITIAL_APPS;
   }
 
+  // Veraltete/fehlerhafte 404-URLs aus alten Versionen sofort mit den signierten Repo-URLs aktualisieren
+  state.apps.forEach(app => {
+    const fresh = INITIAL_APPS.find(init => init.packageName === app.packageName);
+    if (fresh) {
+      if (!app.apkUrl ||
+          app.apkUrl.includes('MiniGameSammlung.apk') ||
+          app.apkUrl.includes('AudioStudioTycoon.apk') ||
+          app.apkUrl.includes('TalkBackTranslator.apk') ||
+          app.apkUrl.includes('app-release-unsigned.apk') ||
+          app.apkUrl.includes('org.videolan.vlc_3050407.apk')) {
+        app.apkUrl = fresh.apkUrl;
+        app.versionCode = fresh.versionCode;
+        app.versionName = fresh.versionName;
+        app.icon = fresh.icon;
+      }
+    }
+  });
+
   // Theme anwenden
   const savedTheme = localStorage.getItem('lauju_store_theme') || 'dark';
   document.body.setAttribute('data-theme', savedTheme);
@@ -446,7 +505,21 @@ function loadSettingsAndState() {
 }
 
 function saveInstalledApps() {
-  localStorage.setItem('lauju_store_installed', JSON.stringify(state.installedApps));
+  try {
+    const cleanInstalled = {};
+    Object.keys(state.installedApps).forEach(pkg => {
+      const inst = state.installedApps[pkg];
+      cleanInstalled[pkg] = {
+        name: inst.name,
+        versionName: inst.versionName,
+        versionCode: inst.versionCode,
+        installedAt: inst.installedAt
+      };
+    });
+    localStorage.setItem('lauju_store_installed', JSON.stringify(cleanInstalled));
+  } catch (e) {
+    console.warn('saveInstalledApps storage quota limit:', e);
+  }
   updateBadgesAndLists();
 }
 
@@ -530,19 +603,25 @@ function getFilteredApps(appsPool) {
       if (repo && !repo.enabled) return false;
     }
 
+    // Status-Filter aus apps.json (nur freigegebene Apps anzeigen, es sei denn vom Nutzer selbst eingereicht)
+    if (app.status && app.status !== 'approved' && !app.isLocalSubmission) {
+      return false;
+    }
+
     // Kategorie-Filter
     if (state.currentCategory !== 'all' && app.category !== state.currentCategory) {
       return false;
     }
 
-    // Suchfilter
+    // Suchfilter (Name, Zusammenfassung, Paket-ID und Autor)
     if (state.searchQuery.trim() !== '') {
       const q = state.searchQuery.toLowerCase();
       const matchName = app.name.toLowerCase().includes(q);
       const matchSummary = (app.summary || '').toLowerCase().includes(q);
       const matchRawSummary = (app.rawSummary || '').toLowerCase().includes(q);
       const matchPkg = app.packageName.toLowerCase().includes(q);
-      if (!matchName && !matchSummary && !matchRawSummary && !matchPkg) return false;
+      const matchAuthor = (app.author || '').toLowerCase().includes(q);
+      if (!matchName && !matchSummary && !matchRawSummary && !matchPkg && !matchAuthor) return false;
     }
 
     // Beta-Versionen Filter (nur anzeigen, wenn Schalter aktiv ist)
@@ -568,7 +647,7 @@ function getFilteredApps(appsPool) {
   });
 }
 
-// 9. Apps im "Entdecken"-Tab rendern
+// 9. Apps im "Entdecken"-Tab rendern (mit TalkBack-Optimierung, Autor-Anzeige und stufenweisem Laden)
 function renderExploreList() {
   const container = document.getElementById('explore-apps-list');
   const countBadge = document.getElementById('app-count-badge');
@@ -596,16 +675,20 @@ function renderExploreList() {
     return;
   }
 
-  const maxInitial = 40;
+  const maxInitial = state.exploreVisibleCount || 40;
   const itemsToRender = filtered.slice(0, maxInitial);
 
   itemsToRender.forEach(app => {
     const isInstalled = !!state.installedApps[app.packageName];
+    const isPaid = (app.paymentType === 'paid');
+    const showAuthor = app.author && (!app.hideAuthor || isPaid);
+    const authorText = showAuthor ? app.author : '';
+
     const card = document.createElement('article');
     card.className = 'app-card';
     card.tabIndex = 0;
     card.setAttribute('role', 'article');
-    card.setAttribute('aria-label', `${app.name}, Version ${app.versionName}. ${isInstalled ? 'Bereits installiert.' : 'Nicht installiert.'}`);
+    card.setAttribute('aria-label', `${app.name}, Version ${app.versionName}${showAuthor ? ', Entwickler: ' + authorText : ''}. ${isInstalled ? 'Bereits installiert.' : 'Nicht installiert.'}`);
 
     card.innerHTML = `
       <div class="app-card-icon" aria-hidden="true">${renderAppIconHtml(app.icon)}</div>
@@ -618,6 +701,7 @@ function renderExploreList() {
           <span>${app.size}</span>
           <span>•</span>
           <span>${getRepoBadge(app.repoId)}</span>
+          ${showAuthor ? `<span>•</span><span style="color: var(--md-sys-color-primary);">👤 ${authorText}</span>` : ''}
           ${app.paymentType === 'paid' ? `<span>•</span><span style="color: #f0883e; font-weight: bold;">💰 ${app.price || 'Kauf'}</span>` : ''}
           ${app.paymentType === 'donation' ? `<span>•</span><span style="color: #d29922; font-weight: bold;">☕ Spende</span>` : ''}
           ${app.isBeta ? `<span>•</span><span style="color: #8957e5; font-weight: bold;">🧪 Beta</span>` : ''}
@@ -660,46 +744,9 @@ function renderExploreList() {
       </button>
     `;
     loadMoreRow.querySelector('button').addEventListener('click', () => {
-      loadMoreRow.remove();
-      const nextBatch = filtered.slice(maxInitial, maxInitial + 40);
-      nextBatch.forEach(app => {
-        const isInstalled = !!state.installedApps[app.packageName];
-        const card = document.createElement('article');
-        card.className = 'app-card';
-        card.tabIndex = 0;
-        card.setAttribute('role', 'article');
-        card.setAttribute('aria-label', `${app.name}, Version ${app.versionName}. ${isInstalled ? 'Bereits installiert.' : 'Nicht installiert.'}`);
-        card.innerHTML = `
-          <div class="app-card-icon" aria-hidden="true">${renderAppIconHtml(app.icon)}</div>
-          <div class="app-card-info">
-            <h3 class="app-card-title">${app.name}</h3>
-            <p class="app-card-desc">${app.summary}</p>
-            <div class="app-card-meta">
-              <span class="app-card-version">v${app.versionName}</span>
-              <span>•</span>
-              <span>${app.size}</span>
-              <span>•</span>
-              <span>${getRepoBadge(app.repoId)}</span>
-              ${app.paymentType === 'paid' ? `<span>•</span><span style="color: #f0883e; font-weight: bold;">💰 ${app.price || 'Kauf'}</span>` : ''}
-              ${app.paymentType === 'donation' ? `<span>•</span><span style="color: #d29922; font-weight: bold;">☕ Spende</span>` : ''}
-              ${app.isBeta ? `<span>•</span><span style="color: #8957e5; font-weight: bold;">🧪 Beta</span>` : ''}
-            </div>
-          </div>
-          <div class="app-card-action">
-            <button class="btn ${isInstalled ? 'outline' : 'primary'}" aria-label="${isInstalled ? app.name + ' öffnen' : app.name + ' installieren'}">
-              ${isInstalled ? 'Öffnen' : 'Laden'}
-            </button>
-          </div>
-        `;
-        card.querySelector('button').addEventListener('click', (e) => {
-          e.stopPropagation();
-          if (isInstalled) openAppByPackage(app.packageName, app.name);
-          else openAppDetails(app);
-        });
-        card.addEventListener('click', () => openAppDetails(app));
-        container.appendChild(card);
-      });
-      announceSR(`${nextBatch.length} weitere Apps geladen.`);
+      state.exploreVisibleCount = (state.exploreVisibleCount || 40) + 40;
+      renderExploreList();
+      announceSR(`${Math.min(filtered.length, state.exploreVisibleCount)} Apps werden jetzt angezeigt.`);
     });
     container.appendChild(loadMoreRow);
   }
@@ -1025,8 +1072,22 @@ async function openAppDetails(app) {
   modal.style.display = 'flex';
   announceSR(`App-Details für ${app.name} geöffnet.`);
 
-  // Falls es sich um ein Online-Suchergebnis handelt, lade reale APK-URL & Details aus f-droid.org
-  if (app.isOnlineResult && (!app.realDetailsLoaded)) {
+  // Falls es sich um ein Online-Suchergebnis oder F-Droid Paket handelt, lade reale APK-URL & Details aus f-droid.org
+  if ((app.isOnlineResult || app.repoId === 'fdroid') && (!app.realDetailsLoaded || (app.apkUrl && app.apkUrl.endsWith(`${app.packageName}.apk`)))) {
+    try {
+      const apiRes = await fetch(`https://f-droid.org/api/v1/packages/${app.packageName}`);
+      if (apiRes.ok) {
+        const pkgData = await apiRes.json();
+        if (pkgData && pkgData.packages && pkgData.packages.length > 0) {
+          const latestPkg = pkgData.packages[0];
+          app.versionCode = latestPkg.versionCode || app.versionCode;
+          app.versionName = latestPkg.versionName || app.versionName;
+          app.apkUrl = `https://f-droid.org/repo/${app.packageName}_${latestPkg.versionCode}.apk`;
+          if (latestPkg.hash) app.sha256 = latestPkg.hash;
+          document.getElementById('modal-app-version').textContent = `v${app.versionName}`;
+        }
+      }
+    } catch(e) {}
     try {
       const res = await fetch(`https://f-droid.org/en/packages/${app.packageName}/`);
       if (res.ok) {
@@ -1035,10 +1096,10 @@ async function openAppDetails(app) {
         const apkMatch = pageHtml.match(/<a href="([^"]+\.apk)">/i);
         const versionMatch = pageHtml.match(/<b>Version\s+([^<]+)<\/b>/i);
 
-        if (apkMatch && apkMatch[1]) {
+        if (apkMatch && apkMatch[1] && (!app.apkUrl || app.apkUrl.endsWith(`${app.packageName}.apk`))) {
           app.apkUrl = apkMatch[1];
         }
-        if (versionMatch && versionMatch[1]) {
+        if (versionMatch && versionMatch[1] && (!app.versionName || app.versionName === 'Neueste')) {
           app.versionName = versionMatch[1].trim();
           document.getElementById('modal-app-version').textContent = `v${app.versionName}`;
         }
@@ -1223,6 +1284,22 @@ async function installAppSilently(app) {
   if (!(await checkWifiRequirement())) return;
 
   try {
+    if (app.repoId === 'fdroid' && (!app.realDetailsLoaded || !app.apkUrl || app.apkUrl.endsWith(`${app.packageName}.apk`))) {
+      try {
+        const apiRes = await fetch(`https://f-droid.org/api/v1/packages/${app.packageName}`);
+        if (apiRes.ok) {
+          const pkgData = await apiRes.json();
+          if (pkgData && pkgData.packages && pkgData.packages.length > 0) {
+            const latestPkg = pkgData.packages[0];
+            app.versionCode = latestPkg.versionCode || app.versionCode;
+            app.versionName = latestPkg.versionName || app.versionName;
+            app.apkUrl = `https://f-droid.org/repo/${app.packageName}_${latestPkg.versionCode}.apk`;
+            if (latestPkg.hash) app.sha256 = latestPkg.hash;
+          }
+        }
+      } catch(e) {}
+    }
+
     const verifyChecksum = document.getElementById('setting-verify-checksum')?.checked ?? true;
     const sha256 = (verifyChecksum && app.sha256) ? app.sha256 : '';
 
@@ -1283,6 +1360,22 @@ async function startAppInstall(app) {
   announceSR(`Download von ${app.name} gestartet...`);
 
   try {
+    if (app.repoId === 'fdroid' && (!app.realDetailsLoaded || !app.apkUrl || app.apkUrl.endsWith(`${app.packageName}.apk`))) {
+      try {
+        const apiRes = await fetch(`https://f-droid.org/api/v1/packages/${app.packageName}`);
+        if (apiRes.ok) {
+          const pkgData = await apiRes.json();
+          if (pkgData && pkgData.packages && pkgData.packages.length > 0) {
+            const latestPkg = pkgData.packages[0];
+            app.versionCode = latestPkg.versionCode || app.versionCode;
+            app.versionName = latestPkg.versionName || app.versionName;
+            app.apkUrl = `https://f-droid.org/repo/${app.packageName}_${latestPkg.versionCode}.apk`;
+            if (latestPkg.hash) app.sha256 = latestPkg.hash;
+          }
+        }
+      } catch(e) {}
+    }
+
     const verifyChecksum = document.getElementById('setting-verify-checksum')?.checked ?? true;
     const sha256 = (verifyChecksum && app.sha256) ? app.sha256 : '';
 
@@ -1384,7 +1477,90 @@ async function syncAllRepositories(silent = false) {
   const syncBtn = document.getElementById('btn-sync-all');
   if (syncBtn) syncBtn.classList.add('pulsing');
 
+  // Vor dem Sync aktuelle installierte Apps vom Gerät einlesen
+  await syncInstalledFromDevice();
+
   let changed = false;
+
+  // 1. Zuerst zentrale Metadaten & Admin-Zentrale Konfigurationen (apps.json) abrufen
+  let customAppsMap = new Map();
+  try {
+    const appsJsonUrls = [
+      `https://raw.githubusercontent.com/Lauju1909/fdroid-repo/main/apps.json?t=${Date.now()}`,
+      `https://lauju1909.github.io/fdroid-repo/apps.json?t=${Date.now()}`
+    ];
+    let customList = null;
+    for (const u of appsJsonUrls) {
+      try {
+        const r = await fetch(u, { cache: 'no-store' });
+        if (r.ok) {
+          customList = await r.json();
+          if (Array.isArray(customList) && customList.length > 0) break;
+        }
+      } catch(e) {}
+    }
+
+    if (Array.isArray(customList)) {
+      customList.forEach(item => {
+        const pkg = item.id || item.packageName;
+        if (pkg) customAppsMap.set(pkg, item);
+      });
+
+      // Bestehende Katalog-Apps mit Admin-Zentrale Metadaten anreichern
+      customList.forEach(item => {
+        const pkg = item.id || item.packageName;
+        if (!pkg) return;
+
+        const existing = state.apps.find(a => a.packageName === pkg || a.id === pkg);
+        if (existing) {
+          if (item.author) existing.author = item.author;
+          if (item.paymentType) existing.paymentType = item.paymentType;
+          if (item.price !== undefined) existing.price = item.price;
+          if (item.paymentUrl !== undefined) existing.paymentUrl = item.paymentUrl;
+          if (item.isBeta !== undefined) existing.isBeta = !!item.isBeta;
+          if (item.status) existing.status = item.status;
+          // Regel: Bei bezahlten Apps kann der Autor nicht ausgeblendet werden
+          existing.hideAuthor = (existing.paymentType === 'paid') ? false : !!item.hideAuthor;
+          if (item.desc || item.description) existing.description = item.desc || item.description;
+          if (item.category) existing.category = item.category;
+          if (item.name && item.name !== existing.packageName) existing.name = item.name;
+          if (item.icon && !existing.icon?.startsWith('data:image')) existing.icon = item.icon;
+          changed = true;
+        } else if (item.status === 'approved') {
+          state.apps.push({
+            id: pkg,
+            packageName: pkg,
+            name: item.name || pkg,
+            summary: item.desc || 'Barrierefreie App aus dem Lauju Ökosystem',
+            description: item.desc || '',
+            versionName: '1.0.0',
+            versionCode: 1,
+            size: '~10 MB',
+            author: item.author || 'Laurin Schneider',
+            hideAuthor: (item.paymentType === 'paid') ? false : !!item.hideAuthor,
+            category: item.category || 'tools',
+            icon: item.icon || '📦',
+            license: 'Open Source',
+            repoId: 'lauju',
+            apkUrl: `https://lauju1909.github.io/fdroid-repo/fdroid/repo/${pkg}_1.apk`,
+            sha256: '',
+            paymentType: item.paymentType || 'free',
+            price: item.price || '',
+            paymentUrl: item.paymentUrl || '',
+            isBeta: !!item.isBeta,
+            status: item.status,
+            sourceUrl: item.repo ? `https://github.com/${item.repo}` : '',
+            changelog: 'Offizielle Store-Veröffentlichung.'
+          });
+          changed = true;
+        }
+      });
+    }
+  } catch (e) {
+    console.warn('Metadaten-Sync von apps.json fehlgeschlagen:', e);
+  }
+
+  // 2. F-Droid & Lauju Paketquellen (index-v1.json) synchronisieren
   for (const repo of state.repositories.filter(r => r.enabled)) {
     try {
       const base = repo.url.replace(/\/+$/, '');
@@ -1426,6 +1602,7 @@ async function syncAllRepositories(silent = false) {
         let iconUrl = iconFile ? `${base}/icons/${iconFile}` : '';
 
         const category = normalizeAppCategory(meta.categories, meta.category || 'tools');
+        const customMeta = customAppsMap.get(meta.packageName);
 
         const existing = state.apps.find(a => a.packageName === meta.packageName);
         if (existing) {
@@ -1443,10 +1620,23 @@ async function syncAllRepositories(silent = false) {
             if (resolvedDesc) existing.description = resolvedDesc;
             if (category) existing.category = category;
             if (changelogText) existing.changelog = changelogText;
-            if (meta.paymentUrl) existing.paymentUrl = meta.paymentUrl;
-            if (meta.paymentType) existing.paymentType = meta.paymentType;
-            if (meta.price) existing.price = meta.price;
-            if (meta.isBeta !== undefined) existing.isBeta = meta.isBeta;
+
+            // Vorrang für customMeta aus apps.json / Admin-Zentrale
+            if (customMeta) {
+              if (customMeta.paymentType) existing.paymentType = customMeta.paymentType;
+              if (customMeta.price !== undefined) existing.price = customMeta.price;
+              if (customMeta.paymentUrl !== undefined) existing.paymentUrl = customMeta.paymentUrl;
+              if (customMeta.isBeta !== undefined) existing.isBeta = !!customMeta.isBeta;
+              if (customMeta.author) existing.author = customMeta.author;
+              existing.hideAuthor = (existing.paymentType === 'paid') ? false : !!customMeta.hideAuthor;
+              if (customMeta.desc) existing.description = customMeta.desc;
+              if (customMeta.status) existing.status = customMeta.status;
+            } else {
+              if (meta.paymentUrl) existing.paymentUrl = meta.paymentUrl;
+              if (meta.paymentType) existing.paymentType = meta.paymentType;
+              if (meta.price) existing.price = meta.price;
+              if (meta.isBeta !== undefined) existing.isBeta = meta.isBeta;
+            }
           }
         } else {
           // Aufnehmen: Alle Lauju-Apps, alle auf dem Gerät installierten Apps (für Updates!)
@@ -1455,27 +1645,33 @@ async function syncAllRepositories(silent = false) {
           const shouldIncludeInCatalog = (repo.id !== 'fdroid') || isInstalledOnDevice || (importedCount < 400);
 
           if (shouldIncludeInCatalog) {
+            const authorName = customMeta?.author || meta.authorName || (repo.id === 'lauju' ? 'Laurin Schneider' : 'F-Droid');
+            const paymentType = customMeta?.paymentType || meta.paymentType || 'free';
+            const hideAuthor = (paymentType === 'paid') ? false : !!customMeta?.hideAuthor;
+
             state.apps.push({
               id: meta.packageName,
               packageName: meta.packageName,
-              name: resolvedName,
+              name: (customMeta?.name) || resolvedName,
               summary: resolvedSummary,
-              description: resolvedDesc,
+              description: (customMeta?.desc) || resolvedDesc,
               versionName: latest.versionName,
               versionCode: latest.versionCode,
               size: sizeMb || '? MB',
-              author: meta.authorName || (repo.id === 'lauju' ? 'Laurin Schneider' : 'F-Droid'),
-              category: category,
-              icon: iconUrl || '📦',
+              author: authorName,
+              hideAuthor: hideAuthor,
+              category: (customMeta?.category) || category,
+              icon: (customMeta?.icon && !customMeta.icon.startsWith('data:image')) ? customMeta.icon : (iconUrl || '📦'),
               license: meta.license || 'Open Source',
               repoId: repo.id,
               apkUrl,
               sha256: sha256,
-              paymentType: meta.paymentType || 'free',
-              price: meta.price || '',
-              paymentUrl: meta.paymentUrl || '',
-              isBeta: !!meta.isBeta || latest.versionName?.toLowerCase().includes('beta'),
-              sourceUrl: meta.sourceCode || '',
+              paymentType: paymentType,
+              price: customMeta?.price || meta.price || '',
+              paymentUrl: customMeta?.paymentUrl || meta.paymentUrl || '',
+              isBeta: customMeta?.isBeta !== undefined ? !!customMeta.isBeta : (!!meta.isBeta || latest.versionName?.toLowerCase().includes('beta')),
+              status: customMeta?.status || 'approved',
+              sourceUrl: meta.sourceCode || (customMeta?.repo ? `https://github.com/${customMeta.repo}` : ''),
               changelog: changelogText
             });
             changed = true;
@@ -1488,7 +1684,18 @@ async function syncAllRepositories(silent = false) {
     }
   }
 
-  localStorage.setItem('lauju_store_catalog', JSON.stringify(state.apps));
+  // Quota-sichere Speicherung im LocalStorage
+  try {
+    const appsToPersist = state.apps.slice(0, 400).map(a => {
+      const copy = { ...a };
+      if (copy.icon && copy.icon.startsWith('data:image')) copy.icon = '📦';
+      return copy;
+    });
+    localStorage.setItem('lauju_store_catalog', JSON.stringify(appsToPersist));
+  } catch (e) {
+    console.warn('Quota limit beim Speichern des Katalogs:', e);
+  }
+
   await syncInstalledFromDevice();
 
   if (syncBtn) syncBtn.classList.remove('pulsing');
@@ -2053,12 +2260,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   await syncInstalledFromDevice();
   scheduleAutoUpdates();
+  syncAllRepositories(true);
   runAutoUpdateCheck(false);
 
   // Beim Zurückkehren in die App erneut prüfen
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
       syncInstalledFromDevice();
+      syncAllRepositories(true);
       runAutoUpdateCheck(false);
     }
   });

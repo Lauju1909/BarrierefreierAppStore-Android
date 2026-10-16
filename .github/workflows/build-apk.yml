@@ -154,3 +154,10 @@ jobs:
             android/app/build/outputs/apk/release/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Trigger Custom F-Droid Repo Update
+        if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) && always()
+        run: |
+          gh workflow run update-repo.yml --repo Lauju1909/fdroid-repo || echo "Repo update trigger skipped"
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}

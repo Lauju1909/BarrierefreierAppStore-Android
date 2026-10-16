@@ -38,36 +38,96 @@ public class UpdateCheckWorker extends Worker {
     public Result doWork() {
         Context context = getApplicationContext();
         try {
-            // Installierte Apps ermitteln
+            // Installierte Benutzer-Apps ermitteln
             PackageManager pm = context.getPackageManager();
             List<PackageInfo> installedList = pm.getInstalledPackages(0);
             Map<String, Long> installedCodes = new HashMap<>();
+            Map<String, String> installedLabels = new HashMap<>();
             for (PackageInfo pi : installedList) {
+                boolean isSystem = (pi.applicationInfo != null) && ((pi.applicationInfo.flags & android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0);
+                if (isSystem) continue;
                 long code = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) ? pi.getLongVersionCode() : pi.versionCode;
                 installedCodes.put(pi.packageName, code);
+                CharSequence lbl = (pi.applicationInfo != null) ? pi.applicationInfo.loadLabel(pm) : null;
+                installedLabels.put(pi.packageName, lbl != null ? lbl.toString() : pi.packageName);
             }
-
-            // Repositories prüfen (Lauju Repo + Offizielles F-Droid Repo)
-            String[] repoUrls = new String[] {
-                    "https://lauju1909.github.io/fdroid-repo/fdroid/repo/index-v1.json",
-                    "https://f-droid.org/repo/index-v1.json"
-            };
 
             java.util.Set<String> updatedPackages = new java.util.HashSet<>();
             String firstAppName = "";
 
-            for (String repoUrl : repoUrls) {
-                HttpURLConnection conn = null;
-                try {
-                    URL url = new URL(repoUrl);
-                    conn = (HttpURLConnection) url.openConnection();
-                    conn.setRequestProperty("User-Agent", "LaujuStore/1.0");
-                    conn.setConnectTimeout(15000);
-                    conn.setReadTimeout(30000);
-                    conn.connect();
+            // 1. Lauju Repo prüfen (kompaktes index-v1.json)
+            HttpURLConnection laujuConn = null;
+            try {
+                URL url = new URL("https://lauju1909.github.io/fdroid-repo/fdroid/repo/index-v1.json");
+                laujuConn = (HttpURLConnection) url.openConnection();
+                laujuConn.setRequestProperty("User-Agent", "LaujuStore/1.0");
+                laujuConn.setConnectTimeout(15000);
+                laujuConn.setReadTimeout(20000);
+                laujuConn.connect();
 
-                    if (conn.getResponseCode() == 200) {
-                        BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                if (laujuConn.getResponseCode() == 200) {
+                    BufferedReader br = new BufferedReader(new InputStreamReader(laujuConn.getInputStream()));
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        sb.append(line);
+                    }
+                    br.close();
+
+                    JSONObject root = new JSONObject(sb.toString());
+                    JSONObject packages = root.optJSONObject("packages");
+                    JSONArray apps = root.optJSONArray("apps");
+
+                    if (packages != null && apps != null) {
+                        for (int i = 0; i < apps.length(); i++) {
+                            JSONObject appObj = apps.getJSONObject(i);
+                            String pkgName = appObj.optString("packageName");
+                            String appName = appObj.optString("name", pkgName);
+
+                            if (installedCodes.containsKey(pkgName) && !updatedPackages.contains(pkgName)) {
+                                long installedCode = installedCodes.get(pkgName);
+                                JSONArray versions = packages.optJSONArray(pkgName);
+                                if (versions != null && versions.length() > 0) {
+                                    long maxCode = 0;
+                                    for (int j = 0; j < versions.length(); j++) {
+                                        JSONObject verObj = versions.getJSONObject(j);
+                                        long vCode = verObj.optLong("versionCode", 0);
+                                        if (vCode > maxCode) maxCode = vCode;
+                                    }
+                                    if (maxCode > installedCode) {
+                                        updatedPackages.add(pkgName);
+                                        if (firstAppName.isEmpty()) {
+                                            firstAppName = appName;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+            } finally {
+                if (laujuConn != null) laujuConn.disconnect();
+            }
+
+            // 2. Offizielles F-Droid Repository speicherschonend über F-Droid Package API v1 prüfen
+            for (Map.Entry<String, Long> entry : installedCodes.entrySet()) {
+                String pkgName = entry.getKey();
+                if (updatedPackages.contains(pkgName)) continue;
+                if (pkgName.startsWith("com.google.") || pkgName.startsWith("com.android.") || pkgName.startsWith("com.samsung.")) {
+                    continue;
+                }
+                HttpURLConnection fdConn = null;
+                try {
+                    URL fdUrl = new URL("https://f-droid.org/api/v1/packages/" + pkgName);
+                    fdConn = (HttpURLConnection) fdUrl.openConnection();
+                    fdConn.setRequestProperty("User-Agent", "LaujuStore/1.0");
+                    fdConn.setConnectTimeout(5000);
+                    fdConn.setReadTimeout(5000);
+                    fdConn.connect();
+
+                    if (fdConn.getResponseCode() == 200) {
+                        BufferedReader br = new BufferedReader(new InputStreamReader(fdConn.getInputStream()));
                         StringBuilder sb = new StringBuilder();
                         String line;
                         while ((line = br.readLine()) != null) {
@@ -75,43 +135,25 @@ public class UpdateCheckWorker extends Worker {
                         }
                         br.close();
 
-                        JSONObject root = new JSONObject(sb.toString());
-                        JSONObject packages = root.optJSONObject("packages");
-                        JSONArray apps = root.optJSONArray("apps");
-
-                        if (packages != null && apps != null) {
-                            for (int i = 0; i < apps.length(); i++) {
-                                JSONObject appObj = apps.getJSONObject(i);
-                                String pkgName = appObj.optString("packageName");
-                                String appName = appObj.optString("name", pkgName);
-
-                                if (installedCodes.containsKey(pkgName) && !updatedPackages.contains(pkgName)) {
-                                    long installedCode = installedCodes.get(pkgName);
-                                    JSONArray versions = packages.optJSONArray(pkgName);
-                                    if (versions != null && versions.length() > 0) {
-                                        long maxCode = 0;
-                                        for (int j = 0; j < versions.length(); j++) {
-                                            JSONObject verObj = versions.getJSONObject(j);
-                                            long vCode = verObj.optLong("versionCode", 0);
-                                            if (vCode > maxCode) maxCode = vCode;
-                                        }
-                                        if (maxCode > installedCode) {
-                                            updatedPackages.add(pkgName);
-                                            if (firstAppName.isEmpty()) {
-                                                firstAppName = appName;
-                                            }
-                                        }
-                                    }
-                                }
+                        JSONObject pkgRoot = new JSONObject(sb.toString());
+                        long maxCode = pkgRoot.optLong("suggestedVersionCode", 0);
+                        JSONArray verArr = pkgRoot.optJSONArray("packages");
+                        if (verArr != null) {
+                            for (int j = 0; j < verArr.length(); j++) {
+                                long vc = verArr.getJSONObject(j).optLong("versionCode", 0);
+                                if (vc > maxCode) maxCode = vc;
+                            }
+                        }
+                        if (maxCode > entry.getValue()) {
+                            updatedPackages.add(pkgName);
+                            if (firstAppName.isEmpty()) {
+                                firstAppName = installedLabels.getOrDefault(pkgName, pkgName);
                             }
                         }
                     }
-                } catch (Exception repoEx) {
-                    // Falls ein Repo temporär nicht erreichbar ist, anderes trotzdem prüfen
+                } catch (Exception ignored) {
                 } finally {
-                    if (conn != null) {
-                        conn.disconnect();
-                    }
+                    if (fdConn != null) fdConn.disconnect();
                 }
             }
 

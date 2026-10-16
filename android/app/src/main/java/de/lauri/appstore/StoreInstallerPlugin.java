@@ -159,7 +159,7 @@ public class StoreInstallerPlugin extends Plugin {
             call.reject("packageName erforderlich");
             return;
         }
-        Intent intent = new Intent(Intent.ACTION_UNINSTALL_PACKAGE);
+        Intent intent = new Intent(Intent.ACTION_DELETE);
         intent.setData(Uri.parse("package:" + pkg));
         intent.putExtra(Intent.EXTRA_RETURN_RESULT, true);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -195,21 +195,24 @@ public class StoreInstallerPlugin extends Plugin {
             }
             obj.put("isSystem", isSystem);
 
-            // Optionales Icon als Data-URL für installierte Apps
+            // Optionales Icon als kompakte Data-URL (96x96) für installierte Apps
             try {
                 Drawable icon = pi.applicationInfo.loadIcon(pm);
                 Bitmap bitmap;
-                if (icon instanceof BitmapDrawable) {
+                if (icon instanceof BitmapDrawable && ((BitmapDrawable) icon).getBitmap() != null) {
                     bitmap = ((BitmapDrawable) icon).getBitmap();
                 } else {
-                    int w = Math.max(1, icon.getIntrinsicWidth());
-                    int h = Math.max(1, icon.getIntrinsicHeight());
+                    int w = Math.max(1, Math.min(96, icon.getIntrinsicWidth()));
+                    int h = Math.max(1, Math.min(96, icon.getIntrinsicHeight()));
                     bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
                     Canvas canvas = new Canvas(bitmap);
                     icon.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
                     icon.draw(canvas);
                 }
                 if (bitmap != null) {
+                    if (bitmap.getWidth() > 96 || bitmap.getHeight() > 96) {
+                        bitmap = Bitmap.createScaledBitmap(bitmap, 96, 96, true);
+                    }
                     ByteArrayOutputStream stream = new ByteArrayOutputStream();
                     bitmap.compress(Bitmap.CompressFormat.PNG, 85, stream);
                     byte[] bytes = stream.toByteArray();
@@ -247,17 +250,39 @@ public class StoreInstallerPlugin extends Plugin {
         new Thread(() -> {
             try {
                 URL url = new URL(finalUrl);
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestProperty("User-Agent", "LaujuStore/1.0");
-                conn.setInstanceFollowRedirects(true);
-                conn.connect();
+                HttpURLConnection conn = null;
+                int redirectCount = 0;
 
-                int responseCode = conn.getResponseCode();
-                if (responseCode == HttpURLConnection.HTTP_MOVED_PERM || responseCode == HttpURLConnection.HTTP_MOVED_TEMP || responseCode == 307 || responseCode == 308) {
-                    String newUrl = conn.getHeaderField("Location");
-                    conn = (HttpURLConnection) new URL(newUrl).openConnection();
+                while (redirectCount < 6) {
+                    conn = (HttpURLConnection) url.openConnection();
                     conn.setRequestProperty("User-Agent", "LaujuStore/1.0");
+                    conn.setConnectTimeout(15000);
+                    conn.setReadTimeout(30000);
+                    conn.setInstanceFollowRedirects(true);
                     conn.connect();
+
+                    int responseCode = conn.getResponseCode();
+                    if (responseCode == HttpURLConnection.HTTP_MOVED_PERM ||
+                        responseCode == HttpURLConnection.HTTP_MOVED_TEMP ||
+                        responseCode == HttpURLConnection.HTTP_SEE_OTHER ||
+                        responseCode == 307 || responseCode == 308) {
+                        String location = conn.getHeaderField("Location");
+                        conn.disconnect();
+                        if (location == null || location.isEmpty()) {
+                            break;
+                        }
+                        url = new URL(url, location);
+                        redirectCount++;
+                    } else {
+                        break;
+                    }
+                }
+
+                int finalCode = conn.getResponseCode();
+                if (finalCode != HttpURLConnection.HTTP_OK) {
+                    conn.disconnect();
+                    call.reject("Download fehlgeschlagen: Server antwortete mit HTTP " + finalCode + " für " + finalUrl);
+                    return;
                 }
 
                 File cacheDir = new File(getContext().getCacheDir(), "apks");
