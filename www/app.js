@@ -1,5 +1,5 @@
 // Lauju Store – Barrierefreier App Store (F-Droid & Neo Store Client)
-// Entwickelt von Laurin Schneider für 100% TalkBack- und Tastatur-Zugänglichkeit
+// Entwickelt von Lauju1909 für 100% TalkBack- und Tastatur-Zugänglichkeit
 
 const APP_VERSION = 'v1.0.10';
 const STORE_PACKAGE = 'de.lauri.appstore';
@@ -43,7 +43,7 @@ const INITIAL_APPS = [
     versionName: '6.9.26',
     versionCode: 38,
     size: '3.6 MB',
-    author: 'Laurin Schneider',
+    author: 'Lauju1909',
     category: 'productivity',
     icon: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/icons/de.lauri.finanzapp.png',
     license: 'MIT',
@@ -64,7 +64,7 @@ const INITIAL_APPS = [
     versionName: '1.9.35',
     versionCode: 36,
     size: '3.2 MB',
-    author: 'Laurin Schneider',
+    author: 'Lauju1909',
     category: 'education',
     icon: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/icons/de.lwl.stundenplan.png',
     license: 'MIT',
@@ -82,7 +82,7 @@ const INITIAL_APPS = [
     versionName: '1.3.2',
     versionCode: 8,
     size: '3.5 MB',
-    author: 'Laurin Schneider',
+    author: 'Lauju1909',
     category: 'education',
     icon: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/icons/de.lauri.vokabelstar.png',
     license: 'MIT',
@@ -100,7 +100,7 @@ const INITIAL_APPS = [
     versionName: '1.2.5',
     versionCode: 8,
     size: '3.5 MB',
-    author: 'Laurin Schneider',
+    author: 'Lauju1909',
     category: 'education',
     icon: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/icons/de.lauri.lernplatform.png',
     license: 'MIT',
@@ -118,7 +118,7 @@ const INITIAL_APPS = [
     versionName: '1.2.1',
     versionCode: 4,
     size: '3.4 MB',
-    author: 'Laurin Schneider',
+    author: 'Lauju1909',
     category: 'education',
     icon: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/icons/de.lauri.bfwenglisch.png',
     license: 'MIT',
@@ -136,7 +136,7 @@ const INITIAL_APPS = [
     versionName: '1.0',
     versionCode: 1,
     size: '3.4 MB',
-    author: 'Laurin Schneider',
+    author: 'Lauju1909',
     category: 'games',
     icon: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/icons/de.lauri.audiostudiotycoon.png',
     license: 'MIT',
@@ -154,7 +154,7 @@ const INITIAL_APPS = [
     versionName: '1.0',
     versionCode: 1,
     size: '3.5 MB',
-    author: 'Laurin Schneider',
+    author: 'Lauju1909',
     category: 'games',
     icon: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/icons/de.lauri.minigames.png',
     license: 'MIT',
@@ -172,7 +172,7 @@ const INITIAL_APPS = [
     versionName: '1.3.2',
     versionCode: 9,
     size: '5.1 MB',
-    author: 'Laurin Schneider',
+    author: 'Lauju1909',
     category: 'accessibility',
     icon: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/icons/com.talkback.translator.png',
     license: 'MIT',
@@ -193,7 +193,7 @@ const INITIAL_APPS = [
     versionName: '1.0.9',
     versionCode: 10,
     size: '3.8 MB',
-    author: 'Laurin Schneider',
+    author: 'Lauju1909',
     category: 'tools',
     icon: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/icons/de.lauri.appstore.png',
     license: 'MIT',
@@ -214,7 +214,7 @@ const INITIAL_APPS = [
     versionName: '1.0.2',
     versionCode: 3,
     size: '3.5 MB',
-    author: 'Laurin Schneider',
+    author: 'Lauju1909',
     category: 'tools',
     icon: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/icons/de.lauri.dokumentenbetrachter.png',
     license: 'MIT',
@@ -477,10 +477,14 @@ function loadSettingsAndState() {
     state.apps = INITIAL_APPS;
   }
 
-  // Veraltete/fehlerhafte 404-URLs aus alten Versionen sofort mit den signierten Repo-URLs aktualisieren
+  // Veraltete/fehlerhafte 404-URLs & Entwicklernamen mit GitHub-Benutzernamen aktualisieren
   state.apps.forEach(app => {
+    if (app.author === 'Laurin Schneider' || (app.repoId === 'lauju' && (!app.author || app.author === 'Laurin Schneider'))) {
+      app.author = 'Lauju1909';
+    }
     const fresh = INITIAL_APPS.find(init => init.packageName === app.packageName);
     if (fresh) {
+      if (fresh.author) app.author = fresh.author;
       if (!app.apkUrl ||
           app.apkUrl.includes('MiniGameSammlung.apk') ||
           app.apkUrl.includes('AudioStudioTycoon.apk') ||
@@ -1536,7 +1540,7 @@ async function syncAllRepositories(silent = false) {
             versionName: '1.0.0',
             versionCode: 1,
             size: '~10 MB',
-            author: item.author || 'Laurin Schneider',
+            author: item.author || 'Lauju1909',
             hideAuthor: (item.paymentType === 'paid') ? false : !!item.hideAuthor,
             category: item.category || 'tools',
             icon: item.icon || '📦',
@@ -1645,7 +1649,7 @@ async function syncAllRepositories(silent = false) {
           const shouldIncludeInCatalog = (repo.id !== 'fdroid') || isInstalledOnDevice || (importedCount < 400);
 
           if (shouldIncludeInCatalog) {
-            const authorName = customMeta?.author || meta.authorName || (repo.id === 'lauju' ? 'Laurin Schneider' : 'F-Droid');
+            const authorName = customMeta?.author || meta.authorName || (repo.id === 'lauju' ? 'Lauju1909' : 'F-Droid');
             const paymentType = customMeta?.paymentType || meta.paymentType || 'free';
             const hideAuthor = (paymentType === 'paid') ? false : !!customMeta?.hideAuthor;
 
