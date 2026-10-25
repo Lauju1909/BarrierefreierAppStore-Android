@@ -337,7 +337,15 @@ public class StoreInstallerPlugin extends Plugin {
                 }
 
                 // Installation über PackageInstaller-Session (wie Google Play):
-                installWithSession(getContext(), apkFile, finalPackageName);
+                if (finalPackageName.equals(getContext().getPackageName())) {
+                    installWithIntent(getContext(), apkFile);
+                } else {
+                    try {
+                        installWithSession(getContext(), apkFile, finalPackageName);
+                    } catch (Exception ex) {
+                        installWithIntent(getContext(), apkFile);
+                    }
+                }
 
                 JSObject ret = new JSObject();
                 ret.put("success", true);
@@ -368,6 +376,23 @@ public class StoreInstallerPlugin extends Plugin {
             return hex.toString();
         } catch (Exception e) {
             return "";
+        }
+    }
+
+    private void installWithIntent(Context context, File apkFile) {
+        try {
+            Uri apkUri = androidx.core.content.FileProvider.getUriForFile(
+                    context,
+                    context.getPackageName() + ".fileprovider",
+                    apkFile
+            );
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
