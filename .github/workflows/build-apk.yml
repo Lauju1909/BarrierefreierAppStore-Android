@@ -93,10 +93,31 @@ jobs:
       - name: Make Gradlew Executable
         run: chmod +x android/gradlew
 
+      - name: Restore Official Release Keystore
+        run: |
+          if [ -n "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+            echo "Release keystore restored from secret."
+          fi
+
       - name: Build APKs with Gradle
         run: |
           cd android
           ./gradlew assembleDebug assembleRelease --no-daemon
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Prepare Signed Release Artifacts
+        run: |
+          TAG="${{ steps.target_tag.outputs.tag }}"
+          if [ -f android/app/build/outputs/apk/release/app-release.apk ]; then
+            echo "Signed release APK successfully created!"
+            cp android/app/build/outputs/apk/release/app-release.apk "android/app/build/outputs/apk/release/Lauju_Store_${TAG}.apk"
+            # Remove any unsigned APK so users never download an unsigned package
+            rm -f android/app/build/outputs/apk/release/app-release-unsigned.apk
+          fi
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
