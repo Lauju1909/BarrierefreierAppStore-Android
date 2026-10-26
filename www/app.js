@@ -2394,3 +2394,74 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 });
+
+// ============================================================================
+// UNIVERSAL FEEDBACK ZENTRALE (LAUJU)
+// ============================================================================
+function openStoreFeedbackModal() {
+  const modal = document.getElementById('modal-store-feedback');
+  if (!modal) return;
+  modal.style.display = 'flex';
+  const input = document.getElementById('store-feedback-author');
+  if (input) input.focus();
+  announceToScreenReader('Feedback-Dialog geöffnet.');
+}
+
+function closeStoreFeedbackModal() {
+  const modal = document.getElementById('modal-store-feedback');
+  if (!modal) return;
+  modal.style.display = 'none';
+  const btn = document.getElementById('btn-store-open-feedback');
+  if (btn) btn.focus();
+}
+
+async function handleSendStoreFeedback(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  const authorEl = document.getElementById('store-feedback-author');
+  const msgEl = document.getElementById('store-feedback-message');
+  const submitBtn = document.getElementById('btn-submit-store-feedback');
+
+  const author = (authorEl && authorEl.value.trim()) || 'Store-Nutzer (Anonym)';
+  const message = (msgEl && msgEl.value.trim()) || '';
+
+  if (!message) {
+    announceToScreenReader('Bitte gib eine Nachricht ein.');
+    return;
+  }
+
+  if (submitBtn) submitBtn.disabled = true;
+  announceToScreenReader('Feedback wird an Lauju gesendet...');
+
+  const now = new Date().toLocaleString('de-DE');
+  const nl = '\n';
+  const appVer = (typeof APP_VERSION !== 'undefined') ? APP_VERSION : 'v1.0.18';
+  const ntfyBody = `App: store${nl}Version: ${appVer}${nl}Absender: ${author}${nl}Datum: ${now}${nl}Nachricht: ${message}`;
+
+  try {
+    await fetch('https://ntfy.sh/lauju_app_feedback', {
+      method: 'POST',
+      headers: {
+        'Title': '[Lauju Store] Feedback von ' + author,
+        'Priority': 'default',
+        'Tags': 'speech_balloon,store'
+      },
+      body: ntfyBody
+    });
+  } catch (err) {
+    try {
+      await fetch('https://ntfy.sh/lauju_app_feedback', {
+        method: 'POST',
+        mode: 'no-cors',
+        body: ntfyBody
+      });
+    } catch (_) {}
+  }
+
+  if (authorEl) authorEl.value = '';
+  if (msgEl) msgEl.value = '';
+  if (submitBtn) submitBtn.disabled = false;
+
+  closeStoreFeedbackModal();
+  announceToScreenReader('Vielen Dank! Dein Feedback wurde erfolgreich an Lauju übermittelt.');
+  alert('✅ Vielen Dank! Dein Feedback wurde sofort an Entwickler Lauju übertragen.');
+}

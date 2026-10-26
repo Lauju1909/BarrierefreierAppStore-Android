@@ -276,6 +276,15 @@
         </div>
       </div>
 
+      <!-- Gruppe 5b: Feedback an Lauju -->
+      <div class="settings-group">
+        <h3 class="settings-group-title">💬 Feedback &amp; App-Wünsche</h3>
+        <p class="settings-group-desc">Hast du eine Idee, einen Fehler gefunden oder wünschst dir eine neue App im Store? Schreib direkt an Lauju!</p>
+        <button id="btn-store-open-feedback" type="button" class="btn primary" style="margin-top: 10px; width: 100%;" onclick="openStoreFeedbackModal()">
+          💬 Feedback oder Wunsch an Lauju senden
+        </button>
+      </div>
+
       <!-- Gruppe 6: Über die App & Selbst-Update -->
       <div class="settings-group">
         <h3 class="settings-group-title">ℹ️ Über Lauju Store</h3>
@@ -289,6 +298,30 @@
       </div>
     </section>
   </main>
+
+  <!-- Modal: Feedback an Lauju senden -->
+  <div id="modal-store-feedback" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-store-feedback-title" style="display: none;">
+    <div class="modal-sheet" style="max-width: 500px; margin: auto;">
+      <div class="modal-header">
+        <h3 id="modal-store-feedback-title">💬 Feedback an Lauju</h3>
+        <button type="button" class="icon-btn close-modal-btn" onclick="closeStoreFeedbackModal()" aria-label="Schließen">✕</button>
+      </div>
+      <form id="form-store-feedback" onsubmit="handleSendStoreFeedback(event)" style="padding: 16px;">
+        <div style="margin-bottom: 14px;">
+          <label for="store-feedback-author" style="display: block; font-weight: bold; margin-bottom: 6px;">Dein Name (optional):</label>
+          <input type="text" id="store-feedback-author" style="width: 100%; box-sizing: border-box; padding: 10px; border-radius: 8px; border: 2px solid var(--border); font-size: 16px;" placeholder="z. B. Max oder Anonym">
+        </div>
+        <div style="margin-bottom: 14px;">
+          <label for="store-feedback-message" style="display: block; font-weight: bold; margin-bottom: 6px;">Deine Nachricht oder dein Wunsch:*</label>
+          <textarea id="store-feedback-message" rows="5" style="width: 100%; box-sizing: border-box; padding: 10px; border-radius: 8px; border: 2px solid var(--border); font-size: 16px; resize: vertical;" placeholder="z. B. Ich wünsche mir eine App für..." required></textarea>
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px;">
+          <button type="button" class="btn outline" onclick="closeStoreFeedbackModal()">Abbrechen</button>
+          <button type="submit" id="btn-submit-store-feedback" class="btn primary">📤 Absenden</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <!-- Bottom Navigation Bar (Material You 3 Style) -->
   <nav class="bottom-nav" role="navigation" aria-label="Hauptnavigation">
