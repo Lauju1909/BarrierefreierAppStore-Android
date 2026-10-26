@@ -339,6 +339,13 @@ public class StoreInstallerPlugin extends Plugin {
                 // Installation über PackageInstaller-Session (wie Google Play):
                 if (finalPackageName.equals(getContext().getPackageName())) {
                     installWithIntent(getContext(), apkFile);
+                    JSObject ev = new JSObject();
+                    ev.put("status", 0);
+                    ev.put("success", true);
+                    ev.put("packageName", finalPackageName);
+                    ev.put("selfUpdate", true);
+                    ev.put("message", "Selbst-Update Dialog gestartet");
+                    notifyListeners("installResult", ev);
                 } else {
                     try {
                         installWithSession(getContext(), apkFile, finalPackageName);
@@ -380,6 +387,10 @@ public class StoreInstallerPlugin extends Plugin {
     }
 
     private void installWithIntent(Context context, File apkFile) {
+        if (apkFile == null || !apkFile.exists()) {
+            android.util.Log.e("StoreInstaller", "installWithIntent: APK Datei existiert nicht!");
+            return;
+        }
         try {
             Uri apkUri = androidx.core.content.FileProvider.getUriForFile(
                     context,
@@ -390,13 +401,15 @@ public class StoreInstallerPlugin extends Plugin {
             intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            intent.putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true);
             context.startActivity(intent);
+            android.util.Log.i("StoreInstaller", "System-Installer Dialog für " + apkFile.getName() + " aufgerufen.");
         } catch (Exception e) {
-            e.printStackTrace();
+            android.util.Log.e("StoreInstaller", "installWithIntent fehlgeschlagen: " + e.getMessage(), e);
         }
     }
 
-    private void installWithSession(final Context context, File apkFile, final String packageName) throws Exception {
+    private void installWithSession(final Context context, final File apkFile, final String packageName) throws Exception {
         android.content.pm.PackageInstaller installer = context.getPackageManager().getPackageInstaller();
         android.content.pm.PackageInstaller.SessionParams params = new android.content.pm.PackageInstaller.SessionParams(
                 android.content.pm.PackageInstaller.SessionParams.MODE_FULL_INSTALL);
@@ -406,7 +419,12 @@ public class StoreInstallerPlugin extends Plugin {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             params.setRequireUserAction(android.content.pm.PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED);
         }
-        int sessionId = installer.createSession(params);
+        if (Build.VERSION.SDK_INT >= 34) {
+            try {
+                params.setPackageSource(android.content.pm.PackageInstaller.PACKAGE_SOURCE_STORE);
+            } catch (Throwable ignored) {}
+        }
+        final int sessionId = installer.createSession(params);
         android.content.pm.PackageInstaller.Session session = installer.openSession(sessionId);
         try (java.io.OutputStream out = session.openWrite("app", 0, apkFile.length());
              java.io.InputStream in = new java.io.FileInputStream(apkFile)) {
@@ -423,18 +441,44 @@ public class StoreInstallerPlugin extends Plugin {
             public void onReceive(Context ctx, Intent intent) {
                 int status = intent.getIntExtra(android.content.pm.PackageInstaller.EXTRA_STATUS, -1);
                 if (status == android.content.pm.PackageInstaller.STATUS_PENDING_USER_ACTION) {
-                    Intent confirm = intent.getParcelableExtra(Intent.EXTRA_INTENT);
+                    Intent confirm = null;
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        try {
+                            confirm = intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent.class);
+                        } catch (Throwable ignored) {}
+                    }
+                    if (confirm == null) {
+                        confirm = intent.getParcelableExtra(Intent.EXTRA_INTENT);
+                    }
                     if (confirm != null) {
                         confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                        ctx.startActivity(confirm);
+                        try {
+                            ctx.startActivity(confirm);
+                        } catch (Exception e) {
+                            android.util.Log.w("StoreInstaller", "Konnte Bestätigungs-Intent nicht starten, Fallback auf installWithIntent", e);
+                            installWithIntent(ctx, apkFile);
+                        }
+                    } else {
+                        android.util.Log.w("StoreInstaller", "Bestätigungs-Intent war null, Fallback auf installWithIntent");
+                        installWithIntent(ctx, apkFile);
                     }
                     return;
                 }
+
+                boolean isSuccess = (status == android.content.pm.PackageInstaller.STATUS_SUCCESS);
+                String msg = intent.getStringExtra(android.content.pm.PackageInstaller.EXTRA_STATUS_MESSAGE);
+
+                if (!isSuccess) {
+                    android.util.Log.w("StoreInstaller", "PackageInstaller Session " + sessionId + " fehlgeschlagen mit Status " + status + " (" + msg + "). Automatischer Fallback auf System-Installer Intent.");
+                    installWithIntent(ctx, apkFile);
+                }
+
                 JSObject ev = new JSObject();
                 ev.put("status", status);
-                ev.put("success", status == android.content.pm.PackageInstaller.STATUS_SUCCESS);
+                ev.put("success", isSuccess);
                 ev.put("packageName", packageName);
-                ev.put("message", intent.getStringExtra(android.content.pm.PackageInstaller.EXTRA_STATUS_MESSAGE));
+                ev.put("fallbackIntent", !isSuccess);
+                ev.put("message", msg != null ? msg : "");
                 notifyListeners("installResult", ev);
                 try { ctx.unregisterReceiver(this); } catch (Exception ignored) {}
             }
