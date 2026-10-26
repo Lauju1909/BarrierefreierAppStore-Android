@@ -24,8 +24,9 @@ android {
                 keyAlias System.getenv('KEY_ALIAS') ?: 'releasekey'
                 keyPassword System.getenv('KEY_PASSWORD') ?: 'LauriAndroid2026!'
                 v1SigningEnabled true
-                v2SigningEnabled true
-                v3SigningEnabled true
+                v2SigningEnabled true
+                enableV3Signing true
+                enableV4Signing true
             }
         }
     }
