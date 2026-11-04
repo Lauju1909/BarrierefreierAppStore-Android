@@ -81,6 +81,12 @@ jobs:
           git push origin main
           git push origin "v$NEW_NAME"
 
+      - name: Get Target Tag
+        id: target_tag
+        run: |
+          TAG=$(grep "versionName" android/app/build.gradle | head -1 | sed -E 's/.*versionName\s+"([^"]+)".*/\1/')
+          echo "tag=v$TAG" >> $GITHUB_OUTPUT
+
       - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
@@ -100,42 +106,48 @@ jobs:
             echo "Release keystore restored from secret."
           fi
 
-      - name: Build APKs with Gradle
+      - name: Build Signed Release APK with Gradle
         run: |
           cd android
-          ./gradlew assembleDebug assembleRelease --no-daemon
+          ./gradlew assembleRelease --no-daemon
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      - name: Prepare Signed Release Artifacts
+      - name: Sign & Verify Release APK (V1 + V2 + V3 F-Droid / Play Protect Standard)
         run: |
           TAG="${{ steps.target_tag.outputs.tag }}"
-          if [ -f android/app/build/outputs/apk/release/app-release.apk ]; then
-            echo "Signed release APK successfully created!"
-            cp android/app/build/outputs/apk/release/app-release.apk "android/app/build/outputs/apk/release/Lauju_Store_${TAG}.apk"
-            # Remove any unsigned APK so users never download an unsigned package
-            rm -f android/app/build/outputs/apk/release/app-release-unsigned.apk
+          APK_PATH="android/app/build/outputs/apk/release/app-release.apk"
+          rm -f android/app/build/outputs/apk/release/app-release-unsigned.apk
+          if [ -f "$APK_PATH" ]; then
+            BUILD_TOOLS=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -n 1)
+            KS_PASS="${{ secrets.KEYSTORE_PASSWORD }}"
+            [ -z "$KS_PASS" ] && KS_PASS="LauriAndroid2026!"
+            K_ALIAS="${{ secrets.KEY_ALIAS }}"
+            [ -z "$K_ALIAS" ] && K_ALIAS="releasekey"
+            "$BUILD_TOOLS/apksigner" sign \
+              --ks android/app/release.keystore \
+              --ks-key-alias "$K_ALIAS" \
+              --ks-pass "pass:$KS_PASS" \
+              --key-pass "pass:$KS_PASS" \
+              --v1-signing-enabled true \
+              --v2-signing-enabled true \
+              --v3-signing-enabled true \
+              "$APK_PATH"
+            "$BUILD_TOOLS/apksigner" verify --print-certs -v "$APK_PATH"
+            cp "$APK_PATH" "android/app/build/outputs/apk/release/Lauju_Store_${TAG}.apk"
+            echo "Signed release APK successfully created: Lauju_Store_${TAG}.apk"
+          else
+            echo "ERROR: Release APK not found!"
+            exit 1
           fi
-
-      - name: Upload Debug APK Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug-apk
-          path: android/app/build/outputs/apk/debug/*.apk
 
       - name: Upload Release APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: release-apk
           path: android/app/build/outputs/apk/release/*.apk
-
-      - name: Get Target Tag
-        id: target_tag
-        run: |
-          TAG=$(grep "versionName" android/app/build.gradle | head -1 | sed -E 's/.*versionName\s+"([^"]+)".*/\1/')
-          echo "tag=v$TAG" >> $GITHUB_OUTPUT
 
       - name: Generate Changelog from Commits
         id: changelog
@@ -161,7 +173,7 @@ jobs:
           echo "$COMMITS" >> release_notes.md
           echo "" >> release_notes.md
           echo "---" >> release_notes.md
-          echo "✨ *Vollautomatisch gebaut und signiert über GitHub Actions beim Push auf \`main\`.*" >> release_notes.md
+          echo "✨ *Vollautomatisch gebaut und signiert (V1+V2+V3 Release-Signatur, F-Droid & Play Protect konform) über GitHub Actions.*" >> release_notes.md
 
       - name: Publish GitHub Release
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
@@ -171,7 +183,6 @@ jobs:
           name: "Lauju Store ${{ steps.target_tag.outputs.tag }}"
           body_path: release_notes.md
           files: |
-            android/app/build/outputs/apk/debug/*.apk
             android/app/build/outputs/apk/release/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,9 +1,7 @@
 package de.lauri.appstore;
 
-import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -17,7 +15,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
 import android.util.Base64;
-import androidx.core.content.FileProvider;
 import androidx.work.Constraints;
 import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.NetworkType;
@@ -33,19 +30,24 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.security.MessageDigest;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 @CapacitorPlugin(name = "StoreInstaller")
 public class StoreInstallerPlugin extends Plugin {
 
-    private static final String ACTION_INSTALL_RESULT = "de.lauri.appstore.INSTALL_RESULT";
+    @Override
+    public void load() {
+        super.load();
+        InstallStatusReceiver.setStatusCallback((success, packageName, status, message) -> {
+            JSObject ev = new JSObject();
+            ev.put("status", status);
+            ev.put("success", success);
+            ev.put("packageName", packageName);
+            ev.put("message", message);
+            notifyListeners("installResult", ev);
+        });
+    }
 
     @PluginMethod
     public void canRequestPackageInstalls(PluginCall call) {
@@ -195,7 +197,6 @@ public class StoreInstallerPlugin extends Plugin {
             }
             obj.put("isSystem", isSystem);
 
-            // Optionales Icon als kompakte Data-URL (96x96) für installierte Apps
             try {
                 Drawable icon = pi.applicationInfo.loadIcon(pm);
                 Bitmap bitmap;
@@ -218,7 +219,8 @@ public class StoreInstallerPlugin extends Plugin {
                     byte[] bytes = stream.toByteArray();
                     obj.put("iconBase64", "data:image/png;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP));
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
 
             arr.put(obj);
         }
@@ -239,119 +241,32 @@ public class StoreInstallerPlugin extends Plugin {
             return;
         }
 
-        if (fileName == null || fileName.isEmpty()) {
-            fileName = "downloaded_app.apk";
-        }
-
-        final String finalFileName = fileName;
+        final String finalFileName = (fileName != null && !fileName.isEmpty()) ? fileName : "package_update.apk";
         final String finalUrl = downloadUrl;
         final String finalPackageName = packageName != null ? packageName : "";
 
         new Thread(() -> {
             try {
-                URL url = new URL(finalUrl);
-                HttpURLConnection conn = null;
-                int redirectCount = 0;
-
-                while (redirectCount < 6) {
-                    conn = (HttpURLConnection) url.openConnection();
-                    conn.setRequestProperty("User-Agent", "LaujuStore/1.0");
-                    conn.setConnectTimeout(15000);
-                    conn.setReadTimeout(30000);
-                    conn.setInstanceFollowRedirects(true);
-                    conn.connect();
-
-                    int responseCode = conn.getResponseCode();
-                    if (responseCode == HttpURLConnection.HTTP_MOVED_PERM ||
-                        responseCode == HttpURLConnection.HTTP_MOVED_TEMP ||
-                        responseCode == HttpURLConnection.HTTP_SEE_OTHER ||
-                        responseCode == 307 || responseCode == 308) {
-                        String location = conn.getHeaderField("Location");
-                        conn.disconnect();
-                        if (location == null || location.isEmpty()) {
-                            break;
+                File apkFile = ApkDownloadClient.fetchPackageArchive(
+                        getContext(),
+                        finalUrl,
+                        finalFileName,
+                        expectedSha256,
+                        (percent, downloadedBytes, totalBytes) -> {
+                            JSObject progressObj = new JSObject();
+                            progressObj.put("percent", percent);
+                            progressObj.put("downloadedBytes", downloadedBytes);
+                            progressObj.put("totalBytes", totalBytes);
+                            progressObj.put("fileName", finalFileName);
+                            progressObj.put("packageName", finalPackageName);
+                            notifyListeners("downloadProgress", progressObj);
                         }
-                        url = new URL(url, location);
-                        redirectCount++;
-                    } else {
-                        break;
-                    }
-                }
+                );
 
-                int finalCode = conn.getResponseCode();
-                if (finalCode != HttpURLConnection.HTTP_OK) {
-                    conn.disconnect();
-                    call.reject("Download fehlgeschlagen: Server antwortete mit HTTP " + finalCode + " für " + finalUrl);
-                    return;
-                }
-
-                File cacheDir = new File(getContext().getCacheDir(), "apks");
-                if (!cacheDir.exists()) {
-                    cacheDir.mkdirs();
-                }
-
-                File apkFile = new File(cacheDir, finalFileName);
-                if (apkFile.exists()) {
-                    apkFile.delete();
-                }
-
-                int totalLength = conn.getContentLength();
-                InputStream is = conn.getInputStream();
-                FileOutputStream fos = new FileOutputStream(apkFile);
-
-                byte[] buffer = new byte[8192];
-                int len;
-                long downloaded = 0;
-                long lastProgressTime = 0;
-
-                while ((len = is.read(buffer)) != -1) {
-                    fos.write(buffer, 0, len);
-                    downloaded += len;
-                    long now = System.currentTimeMillis();
-                    if (now - lastProgressTime > 200 || downloaded == totalLength) {
-                        lastProgressTime = now;
-                        int percent = (totalLength > 0) ? (int) ((downloaded * 100) / totalLength) : -1;
-                        JSObject progressObj = new JSObject();
-                        progressObj.put("percent", percent);
-                        progressObj.put("downloadedBytes", downloaded);
-                        progressObj.put("totalBytes", totalLength);
-                        progressObj.put("fileName", finalFileName);
-                        progressObj.put("packageName", finalPackageName);
-                        notifyListeners("downloadProgress", progressObj);
-                    }
-                }
-
-                fos.flush();
-                fos.close();
-                is.close();
-                conn.disconnect();
-
-                // SHA-256 Prüfsummen-Verifizierung (falls angegeben)
-                if (expectedSha256 != null && !expectedSha256.isEmpty()) {
-                    String actualSha256 = calculateSha256(apkFile);
-                    if (!actualSha256.equalsIgnoreCase(expectedSha256.trim())) {
-                        apkFile.delete();
-                        call.reject("Sicherheitsfehler: SHA-256 Prüfsumme stimmt nicht überein! Erwartet: " + expectedSha256 + ", Tatsächlich: " + actualSha256);
-                        return;
-                    }
-                }
-
-                // Installation über PackageInstaller-Session (wie Google Play):
-                if (finalPackageName.equals(getContext().getPackageName())) {
-                    installWithIntent(getContext(), apkFile);
-                    JSObject ev = new JSObject();
-                    ev.put("status", 0);
-                    ev.put("success", true);
-                    ev.put("packageName", finalPackageName);
-                    ev.put("selfUpdate", true);
-                    ev.put("message", "Selbst-Update Dialog gestartet");
-                    notifyListeners("installResult", ev);
-                } else {
-                    try {
-                        installWithSession(getContext(), apkFile, finalPackageName);
-                    } catch (Exception ex) {
-                        installWithIntent(getContext(), apkFile);
-                    }
+                try {
+                    PackageSessionInstaller.commitInstallSession(getContext(), apkFile, finalPackageName);
+                } catch (Exception sessionEx) {
+                    PackageSessionInstaller.launchFallbackInstallIntent(getContext(), apkFile);
                 }
 
                 JSObject ret = new JSObject();
@@ -363,137 +278,5 @@ public class StoreInstallerPlugin extends Plugin {
                 call.reject("Download/Installation fehlgeschlagen: " + e.getMessage(), e);
             }
         }).start();
-    }
-
-    private String calculateSha256(File file) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            FileInputStream fis = new FileInputStream(file);
-            byte[] buffer = new byte[8192];
-            int n;
-            while ((n = fis.read(buffer)) != -1) {
-                digest.update(buffer, 0, n);
-            }
-            fis.close();
-            byte[] hash = digest.digest();
-            StringBuilder hex = new StringBuilder();
-            for (byte b : hash) {
-                hex.append(String.format("%02x", b));
-            }
-            return hex.toString();
-        } catch (Exception e) {
-            return "";
-        }
-    }
-
-    private void installWithIntent(Context context, File apkFile) {
-        if (apkFile == null || !apkFile.exists()) {
-            android.util.Log.e("StoreInstaller", "installWithIntent: APK Datei existiert nicht!");
-            return;
-        }
-        try {
-            Uri apkUri = androidx.core.content.FileProvider.getUriForFile(
-                    context,
-                    context.getPackageName() + ".fileprovider",
-                    apkFile
-            );
-            Intent intent = new Intent(Intent.ACTION_VIEW);
-            intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            intent.putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true);
-            context.startActivity(intent);
-            android.util.Log.i("StoreInstaller", "System-Installer Dialog für " + apkFile.getName() + " aufgerufen.");
-        } catch (Exception e) {
-            android.util.Log.e("StoreInstaller", "installWithIntent fehlgeschlagen: " + e.getMessage(), e);
-        }
-    }
-
-    private void installWithSession(final Context context, final File apkFile, final String packageName) throws Exception {
-        android.content.pm.PackageInstaller installer = context.getPackageManager().getPackageInstaller();
-        android.content.pm.PackageInstaller.SessionParams params = new android.content.pm.PackageInstaller.SessionParams(
-                android.content.pm.PackageInstaller.SessionParams.MODE_FULL_INSTALL);
-        if (packageName != null && !packageName.isEmpty()) {
-            params.setAppPackageName(packageName);
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            params.setRequireUserAction(android.content.pm.PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED);
-        }
-        if (Build.VERSION.SDK_INT >= 34) {
-            try {
-                params.setPackageSource(android.content.pm.PackageInstaller.PACKAGE_SOURCE_STORE);
-            } catch (Throwable ignored) {}
-        }
-        final int sessionId = installer.createSession(params);
-        android.content.pm.PackageInstaller.Session session = installer.openSession(sessionId);
-        try (java.io.OutputStream out = session.openWrite("app", 0, apkFile.length());
-             java.io.InputStream in = new java.io.FileInputStream(apkFile)) {
-            byte[] buf = new byte[65536];
-            int n;
-            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
-            session.fsync(out);
-        }
-
-        final String action = ACTION_INSTALL_RESULT + "_" + sessionId;
-
-        android.content.BroadcastReceiver receiver = new android.content.BroadcastReceiver() {
-            @Override
-            public void onReceive(Context ctx, Intent intent) {
-                int status = intent.getIntExtra(android.content.pm.PackageInstaller.EXTRA_STATUS, -1);
-                if (status == android.content.pm.PackageInstaller.STATUS_PENDING_USER_ACTION) {
-                    Intent confirm = null;
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        try {
-                            confirm = intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent.class);
-                        } catch (Throwable ignored) {}
-                    }
-                    if (confirm == null) {
-                        confirm = intent.getParcelableExtra(Intent.EXTRA_INTENT);
-                    }
-                    if (confirm != null) {
-                        confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                        try {
-                            ctx.startActivity(confirm);
-                        } catch (Exception e) {
-                            android.util.Log.w("StoreInstaller", "Konnte Bestätigungs-Intent nicht starten, Fallback auf installWithIntent", e);
-                            installWithIntent(ctx, apkFile);
-                        }
-                    } else {
-                        android.util.Log.w("StoreInstaller", "Bestätigungs-Intent war null, Fallback auf installWithIntent");
-                        installWithIntent(ctx, apkFile);
-                    }
-                    return;
-                }
-
-                boolean isSuccess = (status == android.content.pm.PackageInstaller.STATUS_SUCCESS);
-                String msg = intent.getStringExtra(android.content.pm.PackageInstaller.EXTRA_STATUS_MESSAGE);
-
-                if (!isSuccess) {
-                    android.util.Log.w("StoreInstaller", "PackageInstaller Session " + sessionId + " fehlgeschlagen mit Status " + status + " (" + msg + "). Automatischer Fallback auf System-Installer Intent.");
-                    installWithIntent(ctx, apkFile);
-                }
-
-                JSObject ev = new JSObject();
-                ev.put("status", status);
-                ev.put("success", isSuccess);
-                ev.put("packageName", packageName);
-                ev.put("fallbackIntent", !isSuccess);
-                ev.put("message", msg != null ? msg : "");
-                notifyListeners("installResult", ev);
-                try { ctx.unregisterReceiver(this); } catch (Exception ignored) {}
-            }
-        };
-        IntentFilter filter = new IntentFilter(action);
-        if (Build.VERSION.SDK_INT >= 33) {
-            context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED);
-        } else {
-            context.registerReceiver(receiver, filter);
-        }
-
-        Intent resultIntent = new Intent(action).setPackage(context.getPackageName());
-        int flags = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ? PendingIntent.FLAG_MUTABLE : 0);
-        PendingIntent pi = PendingIntent.getBroadcast(context, sessionId, resultIntent, flags);
-        session.commit(pi.getIntentSender());
-        session.close();
     }
 }

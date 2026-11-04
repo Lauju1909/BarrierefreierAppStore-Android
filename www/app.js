@@ -1,7 +1,7 @@
 // Lauju Store – Barrierefreier App Store (F-Droid & Neo Store Client)
 // Entwickelt von Lauju1909 für 100% TalkBack- und Tastatur-Zugänglichkeit
 
-const APP_VERSION = 'v1.0.21';
+const APP_VERSION = 'v1.0.22';
 const STORE_PACKAGE = 'de.lauri.appstore';
 
 // 1. Vorkonfigurierte Standard-Paketquellen
@@ -10,7 +10,7 @@ const DEFAULT_REPOSITORIES = [
     id: 'lauju',
     name: '🌟 Laujus Barrierefreie Apps',
     url: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo',
-    fingerprint: '6CB811B89526A24CE7D41FB3FB4045B9FD0541D2017F96127CA4C407D43FCF0F',
+    fingerprint: '6E29988C99E42885DF447466B3FC50EA921CFD2144A5D360E56A2FDE86500E94',
     enabled: true,
     official: true
   },
@@ -190,9 +190,9 @@ const INITIAL_APPS = [
     name: 'Lauju Store',
     summary: 'Dieser barrierefreie Open-Source App Store (F-Droid & Neo Store Client)',
     description: 'Der moderne, barrierefreie Store für alle deine Android-Anwendungen. Unterstützt F-Droid Repositories, automatische Update-Prüfung, TalkBack-Optimierung und Google Play Protect Konformität.',
-    versionName: '1.0.9',
-    versionCode: 10,
-    size: '3.8 MB',
+    versionName: '1.0.22',
+    versionCode: 23,
+    size: '3.5 MB',
     author: 'Lauju1909',
     category: 'tools',
     icon: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/icons/de.lauri.appstore.png',
@@ -201,9 +201,9 @@ const INITIAL_APPS = [
     paymentType: 'free',
     price: '',
     paymentUrl: 'https://ko-fi.com/lauju1909',
-    apkUrl: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/de.lauri.appstore_1.0.9.apk',
+    apkUrl: 'https://lauju1909.github.io/fdroid-repo/fdroid/repo/de.lauri.appstore_1.0.22.apk',
     sourceUrl: 'https://github.com/Lauju1909/BarrierefreierAppStore-Android',
-    changelog: 'v1.0.9: Offizielle F-Droid Katalog- und Update-Integration, TalkBack-Verbesserungen.'
+    changelog: 'v1.0.22: Vollständige F-Droid & Neo Store Signatur- und Play Protect-Konformität (V1/V2/V3 Release-Signierung, expliziter PackageSessionInstaller).'
   },
   {
     id: 'dokumentenbetrachter',
@@ -2210,7 +2210,7 @@ function setupEventListeners() {
         paymentUrl: paymentUrl,
         isBeta: isBeta,
         hideAuthor: hideAuthor,
-        apkUrl: `https://github.com/${cleanRepo}/releases/latest/download/app-release-unsigned.apk`,
+        apkUrl: `https://github.com/${cleanRepo}/releases/latest/download/app-release.apk`,
         sourceUrl: `https://github.com/${cleanRepo}`,
         changelog: 'Neu über den In-App Publisher Hub eingereicht.'
       };
