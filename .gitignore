@@ -13,6 +13,8 @@ android/*.iml
 android/*/*.iml
 .gradle
 
-# OS
+# OS & Rust
 .DS_Store
 Thumbs.db
+rust-core/target/
+android/app/src/main/jniLibs/

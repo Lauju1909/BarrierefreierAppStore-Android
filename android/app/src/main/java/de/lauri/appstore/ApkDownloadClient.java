@@ -13,9 +13,9 @@ import java.net.URL;
 import java.security.MessageDigest;
 
 /**
- * Modularer HTTPS-Download-Client nach F-Droid / Neo Store Vorbild.
+ * Modularer HTTPS-Download-Client nach F-Droid / Neo Store Vorbild mit nativer Rust-Verifizierung (`RustStoreCore`).
  * Trennt den Netzwerk-Download strikt von der PackageInstaller-Session-Logik
- * und prüft vor der Rückgabe die Paket-Integrität und optionale SHA-256-Prüfsumme.
+ * und prüft vor der Rückgabe die Paket-Integrität (ZIP Central Directory + AndroidManifest.xml + SHA-256) in Rust.
  */
 public class ApkDownloadClient {
 
@@ -30,6 +30,10 @@ public class ApkDownloadClient {
             String expectedSha256,
             ProgressListener listener
     ) throws Exception {
+        if (!RustStoreCore.safeIsValidHttpsUrl(downloadUrl)) {
+            throw new Exception("Unsichere oder ungültige Download-URL (nur HTTPS erlaubt).");
+        }
+
         File repoCacheDir = new File(context.getCacheDir(), "apks");
         if (!repoCacheDir.exists()) {
             repoCacheDir.mkdirs();
@@ -45,9 +49,7 @@ public class ApkDownloadClient {
             }
         }
 
-        String safeName = (fileName != null && fileName.endsWith(".apk"))
-                ? fileName.replaceAll("[^a-zA-Z0-9._-]", "_")
-                : "package_" + System.currentTimeMillis() + ".apk";
+        String safeName = RustStoreCore.safeSanitizeFileName(fileName);
         File targetFile = new File(repoCacheDir, safeName);
         if (targetFile.exists()) {
             targetFile.delete();
@@ -90,13 +92,10 @@ public class ApkDownloadClient {
             conn.disconnect();
         }
 
-        // 1. Optionale SHA-256 Prüfsummen-Kontrolle
-        if (expectedSha256 != null && !expectedSha256.trim().isEmpty()) {
-            String actualHash = computeSha256(targetFile);
-            if (!actualHash.equalsIgnoreCase(expectedSha256.trim())) {
-                targetFile.delete();
-                throw new Exception("SHA-256 Sicherheitsprüfung fehlgeschlagen.");
-            }
+        // 1. Native Rust-Sicherheits- & Archiv-Prüfung (SHA-256 + ZIP Central Directory + AndroidManifest.xml)
+        if (!RustStoreCore.safeVerifyApk(targetFile, expectedSha256)) {
+            targetFile.delete();
+            throw new Exception("Rust-Sicherheitsprüfung fehlgeschlagen: Beschädigtes APK-Archiv oder ungültige SHA-256-Prüfsumme.");
         }
 
         // 2. Paket-Archiv-Validierung über Android PackageManager (wie in F-Droid / Neo Store)
@@ -118,7 +117,7 @@ public class ApkDownloadClient {
             conn.setConnectTimeout(20000);
             conn.setReadTimeout(30000);
             conn.setInstanceFollowRedirects(true);
-            conn.setRequestProperty("User-Agent", "F-Droid/1.21.1 (LaujuStore; Android)");
+            conn.setRequestProperty("User-Agent", "F-Droid/1.21.1 (LaujuStore-RustCore/2.0; Android)");
             conn.setRequestProperty("Accept", "application/vnd.android.package-archive, application/octet-stream, */*");
             conn.connect();
 
@@ -134,6 +133,9 @@ public class ApkDownloadClient {
                     throw new Exception("Ungültige Weiterleitung beim Download.");
                 }
                 currentUrl = new URL(url, location).toString();
+                if (!RustStoreCore.safeIsValidHttpsUrl(currentUrl)) {
+                    throw new Exception("Unsichere Weiterleitung auf Nicht-HTTPS-URL blockiert.");
+                }
                 continue;
             }
             return conn;
@@ -141,7 +143,7 @@ public class ApkDownloadClient {
         throw new Exception("Zu viele Weiterleitungen beim Download.");
     }
 
-    public static String computeSha256(File file) throws Exception {
+    public static String computeSha256JavaFallback(File file) throws Exception {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         try (InputStream fis = new FileInputStream(file)) {
             byte[] buffer = new byte[8192];
